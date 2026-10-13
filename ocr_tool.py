@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import sys
 import tkinter as tk
@@ -9,11 +10,11 @@ from datetime import datetime
 import threading
 import keyboard
 import pytesseract
-from PIL import Image, ImageGrab
+from PIL import Image, ImageGrab, ImageOps, ImageStat
 import pystray
 import ui_icons
 
-APP_VERSION = "2.0.2"  # يطابق version_info.txt
+APP_VERSION = "2.0.3"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
@@ -187,40 +188,95 @@ class SnippingTool:
 # ========================================================
 # 2. معالجة النصوص بواسطة Tesseract
 # ========================================================
-def ocr_score(image, lang):
-    """مجموع (طول الكلمة × ثقة Tesseract) لكل الكلمات؛ أعلى = قراءة أفضل."""
-    data = pytesseract.image_to_data(image, lang=lang, output_type=pytesseract.Output.DICT)
-    return sum(len(word.strip()) * float(conf)
-               for word, conf in zip(data["text"], data["conf"]) if word.strip() and float(conf) > 0)
+# علامات اتجاه غير مرئية (LRM/RLM...) يضعها Tesseract حول الكلمات الإنجليزية؛ تُنسخ مع النص وتربك اللصق
+BIDI_MARKS = re.compile("[\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+BRACKETS = {"(": ")", "[": "]", "{": "}"}
+TARGET_TEXT_HEIGHT = 24  # ارتفاع السطر (بالبكسل) الذي يقرأ عنده Tesseract أفضل في التجارب
 
-def best_scale(image, lang):
-    """Tesseract يقرأ أفضل حين يكون الحرف متوسط الحجم؛ النص الكبير يُصغَّر ويُختار الأفضل.
-    الصور الصغيرة تبقى كما هي حتى لا تتأثر نتائجها."""
-    h = image.height
-    if h < 100:
-        return image
-    factors = (0.5,) if h < 200 else (0.5, 0.33)
-    best, best_score = image, ocr_score(image, lang)
-    for f in factors:
-        smaller = image.resize((max(1, round(image.width * f)), max(1, round(image.height * f))), Image.LANCZOS)
-        score = ocr_score(smaller, lang)
-        if score > best_score:
-            best, best_score = smaller, score
-    return best
+def normalize_for_ocr(image):
+    """رمادي، نص داكن على خلفية فاتحة، وتكبير/تصغير حتى يقارب ارتفاع السطر TARGET_TEXT_HEIGHT."""
+    g = ImageOps.grayscale(image)
+    stat = ImageStat.Stat(g)
+    if stat.mean[0] < 128:  # الثيم الداكن: Tesseract أدق مع نص داكن على فاتح
+        g = ImageOps.invert(g)
+        stat = ImageStat.Stat(g)
+    lo, median = g.getextrema()[0], stat.median[0]
+    ink = g.point(lambda v: 255 if v < (lo + median) / 2 else 0)
+    rows = list(ink.resize((1, ink.height), Image.BOX).getdata())  # متوسط كل صف: > 0 = فيه نص
+    runs, n = [], 0
+    for v in rows:
+        if v > 0:
+            n += 1
+        elif n:
+            runs.append(n)
+            n = 0
+    if n:
+        runs.append(n)
+    runs = sorted(r for r in runs if r > 3)
+    if runs:
+        f = max(0.33, min(4.0, TARGET_TEXT_HEIGHT / runs[len(runs) // 2]))
+        if abs(f - 1) > 0.1:
+            g = g.resize((max(1, round(g.width * f)), max(1, round(g.height * f))), Image.LANCZOS)
+    return ImageOps.expand(g, 20, fill=255)
+
+def read_with_score(image, lang):
+    """قراءة واحدة تعيد (الدرجة، النص)؛ الدرجة = مجموع (طول الكلمة × ثقة Tesseract)."""
+    d = pytesseract.image_to_data(image, lang=lang, output_type=pytesseract.Output.DICT)
+    score, lines, last = 0.0, [], None
+    for i, word in enumerate(d["text"]):
+        word = word.strip()
+        if not word:
+            continue
+        if float(d["conf"][i]) > 0:
+            score += len(word) * float(d["conf"][i])
+        key = (d["block_num"][i], d["par_num"][i], d["line_num"][i])
+        if key != last:
+            lines.append([])
+            last = key
+        lines[-1].append(word)
+    return score, "\n".join(" ".join(line) for line in lines)
+
+def fix_brackets(line):
+    """في النص العربي قد يخرج القوس مقلوباً: ')476 ميغابايت)' ← '(476 ميغابايت)'."""
+    for o, c in BRACKETS.items():
+        if line.count(o) == line.count(c):
+            continue
+        chars, depth = list(line), 0
+        for i, ch in enumerate(chars):
+            if ch == o:
+                depth += 1
+            elif ch == c:
+                if depth:
+                    depth -= 1
+                elif c in line[i + 1:]:
+                    chars[i] = o
+                    depth += 1
+        line = "".join(chars)
+        j = line.rfind(o)
+        if line.count(o) > line.count(c) and j > 0 and line.find(c, j) == -1:
+            line = line[:j] + c + line[j + 1:]  # '(خصم 15(' ← '(خصم 15)'
+    return line
+
+def clean_text(text):
+    text = BIDI_MARKS.sub("", text)
+    lines = (re.sub(r"[ \t]+", " ", fix_brackets(l)).strip() for l in text.split("\n"))
+    return "\n".join(lines).strip()
 
 NO_TEXT_MSG = "لم يتم التعرف على أي نص"
 
 def perform_ocr(image, lang='ara+eng'):
     """تعيد (النص، نجحت؟) حتى لا تُنسخ رسائل الخطأ إلى الحافظة."""
     try:
-        image = best_scale(image, lang)
-        text = pytesseract.image_to_string(image, lang=lang)
+        # نقرأ الصورة المهيّأة والأصلية ونأخذ الأوثق: التهيئة أدق غالباً، والأصلية أفضل لبعض اللقطات المختلطة الخلفية
+        normalized = normalize_for_ocr(image)
+        _, text = max(read_with_score(normalized, lang), read_with_score(image, lang), key=lambda r: r[0])
         if not text.strip():
             # القصّ الصغير أو ذو الحواف الداكنة قد يفشل بالوضع الافتراضي؛ نعيد المحاولة كمقطع نصي واحد
-            text = pytesseract.image_to_string(image, lang=lang, config='--psm 6')
-        if not text.strip():
+            text = pytesseract.image_to_string(normalized, lang=lang, config='--psm 6')
+        text = clean_text(text)
+        if not text:
             return NO_TEXT_MSG, False
-        return text.strip(), True
+        return text, True
     except Exception as e:
         return f"خطأ في Tesseract: {str(e)}", False
 
