@@ -13,7 +13,7 @@ from PIL import Image, ImageGrab
 import pystray
 import ui_icons
 
-APP_VERSION = "2.0.1"  # يطابق version_info.txt
+APP_VERSION = "2.0.2"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:

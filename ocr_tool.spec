@@ -19,16 +19,13 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='ocr_tool',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -37,4 +34,14 @@ exe = EXE(
     entitlements_file=None,
     icon='assets/app_icon.ico',
     version='version_info.txt',
+)
+# بناء بمجلد بدل ملف واحد: لا يُفك البرنامج في Temp عند كل تشغيل فلا تتراكم مجلدات _MEI
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='ocr_tool',
 )

@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="OCR Tool 2.0.1" width="100%">
+<img src="docs/banner.svg" alt="OCR Tool 2.0.2" width="100%">
 
-![version](https://img.shields.io/badge/version-2.0.1-0E7C86)
+![version](https://img.shields.io/badge/version-2.0.2-0E7C86)
 ![platform](https://img.shields.io/badge/platform-Windows-0A4563)
 ![python](https://img.shields.io/badge/python-3.14-F5B544)
 ![ocr](https://img.shields.io/badge/OCR-Tesseract%205-149AA3)
@@ -75,8 +75,8 @@ flowchart LR
 
 ## التشغيل
 
-**الخيار الأول: ملف EXE الجاهز** (لا يحتاج Python):
-نزّل `OCR-Tool-2.0.1.exe` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest) وشغّله. (ما زال يلزمك تثبيت Tesseract، راجع المتطلبات.)
+**الخيار الأول: البرنامج الجاهز** (لا يحتاج Python):
+نزّل `OCR-Tool-2.0.2-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (ما زال يلزمك تثبيت Tesseract، راجع المتطلبات.)
 
 **الخيار الثاني: من الكود المصدري:**
 
@@ -91,7 +91,7 @@ py -3.14 ocr_tool.py
 py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
 ```
 
-الناتج: `dist/ocr_tool.exe` (يحمل رقم الإصدار 2.0.1 وأيقونة التطبيق، ويضم الخط والأيقونات).
+الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.0.2 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
 
 **إعادة توليد الأيقونات:**
 
@@ -108,7 +108,7 @@ tools/make_assets.py مولّد أيقونة التطبيق وملفات SVG
 assets/              الأيقونات (SVG/PNG/ICO) والخطوط
 docs/                اللافتة ولقطات الشاشة
 ocr_tool.spec        إعدادات بناء PyInstaller
-version_info.txt     بيانات إصدار ملف EXE (2.0.1)
+version_info.txt     بيانات إصدار ملف EXE (2.0.2)
 requirements.txt     مكتبات Python
 ```
 
@@ -129,6 +129,11 @@ requirements.txt     مكتبات Python
 - دقة العربية تتأثر بجودة الصورة ونوع الخط، وهي تعتمد على محرك Tesseract.
 - شريط التمرير في صندوق النص يبقى فاتح اللون في الثيم الداكن (مكوّن أصلي من النظام).
 - لا يمنع البرنامج تشغيل أكثر من نسخة في الوقت نفسه.
+
+## ما الجديد في الإصدار 2.0.2
+
+- يأتي البرنامج مجلدًا مضغوطًا (zip) بدل ملف EXE واحد. كان الملف الواحد يُفك في مجلد Temp عند كل تشغيل، ويترك نسخة منه (نحو 65 ميغابايت) كلما أُغلق قسرًا أو أُطفئ الجهاز، فتتراكم مع الوقت إلى غيغابايتات. النسخة الجديدة تعمل من مكانها ولا تترك شيئًا، وتبدأ أسرع.
+- إن كنت تستخدم اختصارًا أو التشغيل مع Windows، فوجّهه إلى `ocr_tool.exe` داخل المجلد الجديد. ويمكنك حذف مجلدات `_MEI` القديمة من `%TEMP%` والبرنامج مغلق.
 
 ## ما الجديد في الإصدار 2.0.1
 
@@ -215,8 +220,8 @@ flowchart LR
 
 ## Running
 
-**Option 1: the prebuilt EXE** (no Python needed):
-download `OCR-Tool-2.0.1.exe` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest) and run it. (You still need Tesseract installed, see Requirements.)
+**Option 1: the prebuilt app** (no Python needed):
+download `OCR-Tool-2.0.2-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (You still need Tesseract installed, see Requirements.)
 
 **Option 2: from source:**
 
@@ -231,7 +236,7 @@ py -3.14 ocr_tool.py
 py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
 ```
 
-Output: `dist/ocr_tool.exe` (carries version 2.0.1 and the app icon, with fonts and icons bundled).
+Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.0.2 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
 
 **Regenerate the icons:**
 
@@ -248,7 +253,7 @@ tools/make_assets.py app icon and SVG generator
 assets/              icons (SVG/PNG/ICO) and fonts
 docs/                banner and screenshots
 ocr_tool.spec        PyInstaller build settings
-version_info.txt     EXE version metadata (2.0.1)
+version_info.txt     EXE version metadata (2.0.2)
 requirements.txt     Python packages
 ```
 
@@ -269,6 +274,11 @@ requirements.txt     Python packages
 - Arabic accuracy depends on image quality and font, and on the Tesseract engine.
 - The scrollbar in the text box stays light in the dark theme (a native system control).
 - The app does not prevent running more than one instance.
+
+## What's new in 2.0.2
+
+- The app now ships as a zipped folder instead of a single EXE. The single file unpacked itself into Temp on every launch and left a copy behind (about 65 MB) whenever it was killed or Windows shut down, piling up to gigabytes over time. The new build runs in place, leaves nothing behind, and starts faster.
+- If you use a shortcut or start it with Windows, point it to `ocr_tool.exe` inside the new folder. You can delete old `_MEI` folders from `%TEMP%` while the app is closed.
 
 ## What's new in 2.0.1
 
