@@ -13,11 +13,17 @@ from PIL import Image, ImageGrab
 import pystray
 import ui_icons
 
-APP_VERSION = "2.0.0"  # يطابق version_info.txt
+APP_VERSION = "2.0.1"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
     ctypes.windll.user32.SetProcessDPIAware()
+except Exception:
+    pass
+
+# هوية مستقلة للتطبيق في شريط المهام: يأخذ أيقونة نافذته بدل أيقونة مخزَّنة قديمة لمسار الملف
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("alimwork85.ScreenOCRTool.2")
 except Exception:
     pass
 
@@ -395,6 +401,9 @@ root.geometry(f"{px(850)}x{px(600)}")
 root.minsize(px(560), px(440))
 try:
     root.iconbitmap(resource_path("assets/app_icon.ico"))
+    # الأيقونة الكبيرة لزر شريط المهام (256) بصيغة PNG
+    _window_icon = tk.PhotoImage(file=resource_path("assets/app_icon_256.png"))
+    root.iconphoto(True, _window_icon)
 except Exception:
     pass  # الأيقونة تحسين شكلي فقط
 
@@ -520,7 +529,7 @@ if not TESSERACT_PATH:
 if __name__ == "__main__":
     setup_hotkey()
     setup_tray()
-    if tray_icon:
+    if tray_icon and "--show" not in sys.argv:  # --show: يبدأ بنافذة ظاهرة
         # يبدأ مخفياً: الوجود الوحيد في منطقة الإشعارات (الأيقونات المخفية)، بلا نافذة ولا زر في شريط المهام
         hide_to_tray()
         root.after(1500, lambda: notify_if_hidden("يعمل في الخلفية. اضغط Ctrl+Shift+X لالتقاط نص"))

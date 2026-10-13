@@ -5,7 +5,7 @@ a = Analysis(
     ['ocr_tool.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets/app_icon.ico', 'assets'), ('assets/app_icon_64.png', 'assets'), ('assets/fonts/Tajawal-Regular.ttf', 'assets/fonts'), ('assets/fonts/Tajawal-Bold.ttf', 'assets/fonts')],
+    datas=[('assets/app_icon.ico', 'assets'), ('assets/app_icon_64.png', 'assets'), ('assets/app_icon_256.png', 'assets'), ('assets/fonts/Tajawal-Regular.ttf', 'assets/fonts'), ('assets/fonts/Tajawal-Bold.ttf', 'assets/fonts')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
