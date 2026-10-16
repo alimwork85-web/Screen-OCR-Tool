@@ -2,8 +2,8 @@
 # معلومات إصدار ملف EXE (تظهر في: خصائص الملف > تفاصيل). عدّل الرقم هنا وفي APP_VERSION داخل ocr_tool.py معاً.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 3, 0),
-    prodvers=(2, 0, 3, 0),
+    filevers=(2, 1, 0, 0),
+    prodvers=(2, 1, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -14,13 +14,14 @@ VSVersionInfo(
   kids=[
     StringFileInfo([
       StringTable('040904B0', [
-        StringStruct('CompanyName', ''),
+        StringStruct('CompanyName', 'Ali Alhumedi'),
         StringStruct('FileDescription', 'OCR Tool - Arabic and English screen text extraction'),
-        StringStruct('FileVersion', '2.0.3.0'),
+        StringStruct('FileVersion', '2.1.0.0'),
         StringStruct('InternalName', 'ocr_tool'),
+        StringStruct('LegalCopyright', '© 2026 Ali Alhumedi'),
         StringStruct('OriginalFilename', 'ocr_tool.exe'),
         StringStruct('ProductName', 'OCR Tool'),
-        StringStruct('ProductVersion', '2.0.3')
+        StringStruct('ProductVersion', '2.1.0')
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
