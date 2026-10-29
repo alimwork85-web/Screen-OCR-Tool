@@ -16,6 +16,7 @@ OLLAMA_TIMEOUT = 90  # أول طلب يحمّل النموذج في الذاكر
 # الأدق أولاً في التجربة على نص عربي/إنجليزي مختلط؛ يُستخدم أول نموذج مثبّت منها
 OLLAMA_MODELS = ["gemma3:4b", "kaelri/hy-mt2", "gemma4:e4b", "llama3.1:8b", "qwen3:8b"]
 LANG_NAMES = {"ar": "Arabic", "en": "English"}
+UI_EN = False  # يضبطه ocr_tool حسب لغة الواجهة، لرسائل الفشل فقط
 
 ARABIC = re.compile("[؀-ۿ]")
 LATIN = re.compile("[A-Za-z]")
@@ -96,10 +97,12 @@ def translate(text, on_fallback=None):
         return out, "Google", tl
     model = ollama_model()
     if not model:
-        return None, "تعذّرت الترجمة: لا اتصال بالإنترنت، وOllama غير متاح", tl
+        return None, ("Translation failed: no internet connection and Ollama is unavailable" if UI_EN else
+                      "تعذّرت الترجمة: لا اتصال بالإنترنت، وOllama غير متاح"), tl
     if on_fallback:
         on_fallback(model)
     out = ollama_translate(text, tl, model)
     if out:
         return out, f"Ollama · {model}", tl
-    return None, f"تعذّرت الترجمة: لا اتصال بالإنترنت، ولم يرد Ollama ({model})", tl
+    return None, (f"Translation failed: no internet connection and Ollama ({model}) did not respond" if UI_EN else
+                  f"تعذّرت الترجمة: لا اتصال بالإنترنت، ولم يرد Ollama ({model})"), tl

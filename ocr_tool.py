@@ -2,9 +2,10 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, scrolledtext, ttk
 import ctypes
 import time
 from datetime import datetime
@@ -19,7 +20,7 @@ import pystray
 import ui_icons
 import translator
 
-APP_VERSION = "2.1.0"  # يطابق version_info.txt
+APP_VERSION = "2.2.0"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
@@ -36,10 +37,10 @@ except Exception:
 # نسخة واحدة فقط: التشغيل الثاني يطلب من الأولى إظهار نافذتها ثم يخرج (قبل إنشاء أي نافذة)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 kernel32.CreateMutexW.restype = kernel32.CreateEventW.restype = kernel32.OpenEventW.restype = ctypes.c_void_p
-kernel32.SetEvent.argtypes = [ctypes.c_void_p]
+kernel32.SetEvent.argtypes = kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
 kernel32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
 SHOW_EVENT_NAME = "alimwork85.ScreenOCRTool.show"
-show_event = None
+show_event = _instance_mutex = None
 if __name__ == "__main__":
     try:
         _instance_mutex = kernel32.CreateMutexW(None, False, "alimwork85.ScreenOCRTool.instance")
@@ -82,7 +83,7 @@ def system_theme():
 
 theme_mode = system_theme()
 T = dict(THEMES[theme_mode])  # يُعدَّل في مكانه عند تغيّر الثيم
-current_status = ("جاهز للاستخدام", "info")
+current_status = ("", "info")  # تُضبط بلغة الواجهة عند إنشاء سطر الحالة
 
 def resource_path(rel):
     """مسار ملف مرفق، سواء شُغّل البرنامج من الكود أو من ملف EXE."""
@@ -102,9 +103,14 @@ def load_font():
 
 FONT = load_font()
 
-# تحديد مسار Tesseract: المسار الافتراضي أولاً، ثم PATH
+# تحديد مسار Tesseract: النسخة المرفقة مع البرنامج أولاً، ثم التثبيت الافتراضي، ثم PATH
+BUNDLED_TESSERACT = resource_path("tesseract/tesseract.exe")
 DEFAULT_TESSERACT = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-TESSERACT_PATH = DEFAULT_TESSERACT if os.path.exists(DEFAULT_TESSERACT) else shutil.which('tesseract')
+if os.path.exists(BUNDLED_TESSERACT):
+    TESSERACT_PATH = BUNDLED_TESSERACT
+    os.environ["TESSDATA_PREFIX"] = resource_path("tesseract/tessdata")  # حزم اللغات المرفقة
+else:
+    TESSERACT_PATH = DEFAULT_TESSERACT if os.path.exists(DEFAULT_TESSERACT) else shutil.which('tesseract')
 if TESSERACT_PATH:
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
@@ -200,14 +206,17 @@ class SnippingTool:
                 # إحداثيات الطبقة نسبية لزاويتها، فنحوّلها إلى إحداثيات الشاشة
                 bbox = (x1 + self.origin_x, y1 + self.origin_y, x2 + self.origin_x, y2 + self.origin_y)
                 screenshot = ImageGrab.grab(bbox=bbox, all_screens=True)
+                settings["last_region"] = list(bbox)  # لإعادة قراءة المنطقة نفسها من الاختصار الثاني
+                save_settings()
                 self.on_crop_complete(screenshot)
             except Exception as e:
-                messagebox.showerror("خطأ في القص", f"فشل التقاط الشاشة: {e}")
+                messagebox.showerror(L("خطأ في القص", "Capture error"),
+                                     L(f"فشل التقاط الشاشة: {e}", f"Could not capture the screen: {e}"))
                 if self.on_cancel:
                     self.on_cancel()
         else:
             if self.on_cancel:
-                self.on_cancel("التحديد صغير جداً، حدّد مساحة أكبر", "warn")
+                self.on_cancel(L("التحديد صغير جداً، حدّد مساحة أكبر", "Selection too small, select a larger area"), "warn")
 
 # ========================================================
 # 2. معالجة النصوص بواسطة Tesseract
@@ -286,8 +295,6 @@ def clean_text(text):
     lines = (re.sub(r"[ \t]+", " ", fix_brackets(l)).strip() for l in text.split("\n"))
     return "\n".join(lines).strip()
 
-NO_TEXT_MSG = "لم يتم التعرف على أي نص"
-
 def perform_ocr(image, lang='ara+eng'):
     """تعيد (النص، نجحت؟) حتى لا تُنسخ رسائل الخطأ إلى الحافظة."""
     try:
@@ -305,7 +312,7 @@ def perform_ocr(image, lang='ara+eng'):
             return NO_TEXT_MSG, False
         return text, True
     except Exception as e:
-        return f"خطأ في Tesseract: {str(e)}", False
+        return L(f"خطأ في Tesseract: {str(e)}", f"Tesseract error: {str(e)}"), False
 
 # ========================================================
 # 3. التحكم في الأحداث والواجهة
@@ -338,7 +345,7 @@ def set_status(text, kind="info"):
     color_key, icon = STATUS_KINDS[kind]
     color = T[color_key]
     image = ui_icons.tk_icon(icon, px(18), color) if icon else ""
-    status_label.config(text=text, fg=color, image=image, compound="right")
+    status_label.config(text=text, fg=color, image=image, compound=SIDE)
 
 def start_capture():
     global capture_active
@@ -363,7 +370,7 @@ def process_image(screenshot):
     capture_active = False
     if window_was_visible:
         show_window()
-    set_status("جاري قراءة النص", "busy")
+    set_status(L("جاري قراءة النص", "Reading text"), "busy")
 
     # اللغة تُقرأ هنا في خيط الواجهة، والقراءة في خيط منفصل حتى لا تتجمد الواجهة
     lang = lang_var.get()
@@ -397,20 +404,55 @@ def ocr_from_clipboard():
         return
     image = clipboard_image()
     if image is None:
-        set_status("لا توجد صورة في الحافظة. انسخ صورة أولاً", "warn")
-        notify_if_hidden("لا توجد صورة في الحافظة")
+        set_status(L("لا توجد صورة في الحافظة. انسخ صورة أولاً", "No image on the clipboard. Copy an image first"), "warn")
+        notify_if_hidden(L("لا توجد صورة في الحافظة", "No image on the clipboard"))
         return
     window_was_visible = ui_visible  # لا تظهر النافذة إن كان الطلب من الشريط وهي مخفية
     process_image(image)
 
-def update_gui(text, ok):
+def capture_last_region():
+    """يقرأ منطقة آخر تحديد مرة أخرى بلا طبقة تحديد؛ مفيد لترجمة الشرائح والفيديو."""
+    global window_was_visible
+    if capture_active:
+        return
+    bbox = settings["last_region"]
+    vx, vy, vw, vh = get_virtual_screen()
+    if not bbox or not (vx <= bbox[0] < bbox[2] <= vx + vw and vy <= bbox[1] < bbox[3] <= vy + vh):
+        message = L("لا توجد منطقة محفوظة تناسب الشاشات الحالية. حدّد منطقة أولاً",
+                    "No saved region fits the current screens. Select an area first")
+        set_status(message, "warn")
+        notify_if_hidden(message)
+        return
+    window_was_visible = ui_visible
+    if window_was_visible:  # نُخفي نافذتنا فلا تظهر داخل الصورة المقروءة، ويعيدها process_image
+        root.withdraw()
+        root.update()
+        time.sleep(0.15)
+    try:
+        image = ImageGrab.grab(bbox=tuple(bbox), all_screens=True)
+    except Exception as e:
+        if window_was_visible:
+            show_window()
+        set_status(L(f"تعذّر التقاط المنطقة: {e}", f"Could not capture the region: {e}"), "error")
+        return
+    process_image(image)
+
+def rtl_tags(text):
+    """وسم المحاذاة اليمنى للنص العربي الغالب (target_lang تعيد en للنص العربي)."""
+    return ("rtl",) if translator.target_lang(text) == "en" else ()
+
+def show_original(text):
+    """يكتب النص الأصلي ويحاذيه حسب لغته، لا حسب لغة الواجهة."""
     original_text_area.delete("1.0", tk.END)
-    original_text_area.insert(tk.END, text)
+    original_text_area.insert(tk.END, text, rtl_tags(text))
+
+def update_gui(text, ok):
+    show_original(text)
     if ok:
         copy_to_clipboard(text)
         add_to_history(text)
-        set_status("تم استخراج النص والنسخ بنجاح", "ok")
-        notify_if_hidden("تم نسخ النص إلى الحافظة")
+        set_status(L("تم استخراج النص والنسخ بنجاح", "Text extracted and copied"), "ok")
+        notify_if_hidden(L("تم نسخ النص إلى الحافظة", "Text copied to the clipboard"))
     else:
         set_status(text, "warn" if text == NO_TEXT_MSG else "error")
         notify_if_hidden(text)
@@ -425,14 +467,15 @@ def translate_text(text):
     if translation_busy:
         return
     if not text:
-        set_status("لا يوجد نص للترجمة", "warn")
+        set_status(L("لا يوجد نص للترجمة", "No text to translate"), "warn")
         return
     translation_busy = True
     btn_translate.config(state="disabled")
-    set_status("جاري الترجمة", "busy")
+    set_status(L("جاري الترجمة", "Translating"), "busy")
 
     def on_fallback(model):
-        root.after(0, lambda: set_status(f"Google غير متاح، جاري الترجمة محلياً بـ {model} (قد تستغرق ثوانٍ)", "busy"))
+        root.after(0, lambda: set_status(L(f"Google غير متاح، جاري الترجمة محلياً بـ {model} (قد تستغرق ثوانٍ)",
+                                           f"Google unavailable, translating locally with {model} (may take a few seconds)"), "busy"))
 
     def worker():
         result = translator.translate(text, on_fallback)
@@ -448,14 +491,15 @@ def show_translation(out, source, tl):
         set_status(source, "error")  # source هنا سبب الفشل
         return
     if not translation_frame.winfo_manager():  # يظهر المربع بعد أول ترجمة فقط
-        translation_frame.pack(side='left', fill='y', before=original_text_area, padx=(0, px(12)))
-    translation_label.config(text=f"الترجمة ({source})")
+        translation_frame.pack(side=END_SIDE, fill='y', before=original_text_area,
+                               padx=(px(12), 0) if UI_EN else (0, px(12)))
+    translation_label.config(text=L(f"الترجمة ({source})", f"Translation ({source})"))
     translation_area.config(state="normal")
     translation_area.delete("1.0", tk.END)
     translation_area.insert(tk.END, out, ("rtl",) if tl == "ar" else ())
     translation_area.config(state="disabled")
     copy_to_clipboard(out)
-    set_status("تمت الترجمة ونُسخت إلى الحافظة", "copied")
+    set_status(L("تمت الترجمة ونُسخت إلى الحافظة", "Translated and copied to the clipboard"), "copied")
 
 def translate_all():
     translate_text(original_text_area.get("1.0", tk.END))
@@ -466,13 +510,13 @@ SEARCH_LIMIT = 500  # طول معقول لعبارة البحث
 def search_text(text):
     query = " ".join(text.split())[:SEARCH_LIMIT]  # الأسطر والمسافات الزائدة تصير مسافة واحدة
     if not query:
-        set_status("لا يوجد نص للبحث", "warn")
+        set_status(L("لا يوجد نص للبحث", "No text to search"), "warn")
         return
     try:
         webbrowser.open("https://www.google.com/search?" + urllib.parse.urlencode({"q": query}))
-        set_status("فُتح البحث في المتصفح", "ok")
+        set_status(L("فُتح البحث في المتصفح", "Search opened in the browser"), "ok")
     except Exception as e:
-        set_status(f"تعذّر فتح المتصفح: {e}", "error")
+        set_status(L(f"تعذّر فتح المتصفح: {e}", f"Could not open the browser: {e}"), "error")
 
 def search_all():
     search_text(original_text_area.get("1.0", tk.END))
@@ -496,7 +540,8 @@ def hide_to_tray():
     global ui_visible
     ui_visible = False
     root.withdraw()
-    set_status("التطبيق يعمل في الخلفية (Ctrl+Shift+X)", "info")
+    set_status(L(f"التطبيق يعمل في الخلفية ({pretty_hotkey(settings['hotkey'])})",
+                 f"Running in the background ({pretty_hotkey(settings['hotkey'])})"), "info")
 
 def quit_app():
     try:
@@ -513,13 +558,14 @@ def setup_tray():
     # دوال القائمة تُستدعى من خيط الشريط، فنحوّلها إلى خيط الواجهة
     to_ui = lambda fn: (lambda icon=None, item=None: root.after(0, fn))
     menu = pystray.Menu(
-        pystray.MenuItem("فتح النافذة", to_ui(show_window), default=True),
-        pystray.MenuItem("التقاط نص من الشاشة", to_ui(start_capture)),
-        pystray.MenuItem("قراءة صورة من الحافظة", to_ui(ocr_from_clipboard)),
-        pystray.MenuItem("خروج", to_ui(quit_app)),
+        pystray.MenuItem(L("فتح النافذة", "Open window"), to_ui(show_window), default=True),
+        pystray.MenuItem(L("التقاط نص من الشاشة", "Capture text from screen"), to_ui(start_capture)),
+        pystray.MenuItem(L("قراءة صورة من الحافظة", "Read image from clipboard"), to_ui(ocr_from_clipboard)),
+        pystray.MenuItem(L("قراءة آخر منطقة", "Read last region"), to_ui(capture_last_region)),
+        pystray.MenuItem(L("خروج", "Exit"), to_ui(quit_app)),
     )
     try:
-        tray_icon = pystray.Icon("ocr_tool", make_tray_image(), f"أداة OCR {APP_VERSION}", menu)
+        tray_icon = pystray.Icon("ocr_tool", make_tray_image(), L(f"أداة OCR {APP_VERSION}", f"OCR Tool {APP_VERSION}"), menu)
         tray_icon.run_detached()
         root.protocol("WM_DELETE_WINDOW", hide_to_tray)
     except Exception:
@@ -560,20 +606,108 @@ def write_json(path, data):
     except Exception:
         return False
 
-# الإعدادات: لغة القراءة وحالة أسهم الطي، تُحفظ فور تغييرها
+# الإعدادات: لغة القراءة وحالة أسهم الطي ولغة الواجهة، تُحفظ فور تغييرها
 LANG_VALUES = ('ara+eng', 'ara', 'eng')
+HOTKEY_DEFAULT = "ctrl+shift+x"
+LAST_REGION_HOTKEY = "ctrl+shift+z"  # ثابت لقراءة آخر منطقة، لا يقبل التغيير
+HOTKEY_MODIFIERS = ("ctrl", "alt", "shift", "windows", "win")
+
+def valid_hotkey(combo):
+    """تركيبة مقبولة: مفتاح تعديل ومفتاح آخر على الأقل."""
+    parts = str(combo).lower().split("+")
+    return len(parts) > 1 and any(part in HOTKEY_MODIFIERS for part in parts)
+
+def same_hotkey(first, second):
+    """مقارنة بكود المسح لا بالحرف، فتتساوى 'ctrl+shift+z' مع ما يقرأه نفس الضغط في لغة أخرى."""
+    try:
+        return keyboard.parse_hotkey_combinations(first) == keyboard.parse_hotkey_combinations(second)
+    except Exception:
+        return first == second
+
+def pretty_hotkey(combo):
+    """'ctrl+shift+x' ← 'Ctrl+Shift+X' للعرض في الواجهة."""
+    return "+".join(part.capitalize() for part in combo.split("+"))
 
 def load_settings():
     def convert(data):
         collapsed = data.get("collapsed", {})
+        hotkey = str(data.get("hotkey", "")).lower()
+        region = data.get("last_region")
+        if not (isinstance(region, list) and len(region) == 4 and all(isinstance(v, int) for v in region)):
+            region = None
         return {"lang": data.get("lang") if data.get("lang") in LANG_VALUES else 'ara+eng',
-                "collapsed": {k: bool(v) for k, v in collapsed.items()} if isinstance(collapsed, dict) else {}}
-    return read_json(SETTINGS_PATH, convert, {"lang": 'ara+eng', "collapsed": {}})
+                "collapsed": {k: bool(v) for k, v in collapsed.items()} if isinstance(collapsed, dict) else {},
+                "ui": "en" if data.get("ui") == "en" else "ar",
+                "autostart": data.get("autostart") is True,
+                "hotkey": hotkey if valid_hotkey(hotkey) else HOTKEY_DEFAULT,
+                "last_region": region}
+    return read_json(SETTINGS_PATH, convert, {"lang": 'ara+eng', "collapsed": {}, "ui": "ar",
+                                              "autostart": False, "hotkey": HOTKEY_DEFAULT, "last_region": None})
 
 settings = load_settings()
 
+# لغة الواجهة تُقرأ مرة عند البدء؛ الإنجليزية تقلب الترتيب إلى اليسار، وتغييرها يعيد التشغيل (switch_ui_language)
+UI_EN = settings["ui"] == "en"
+SIDE, END_SIDE, ANCHOR = ('left', 'right', 'w') if UI_EN else ('right', 'left', 'e')
+translator.UI_EN = UI_EN
+
+def L(ar, en):
+    """النص بلغة الواجهة."""
+    return en if UI_EN else ar
+
+def mirror(pad):
+    """هامش (يسار، يمين) مكتوب للعربية؛ يُعكس في الإنجليزية."""
+    return pad[::-1] if UI_EN else pad
+
+# سهم الطي يشير نحو المحتوى وهو ظاهر، وعكسه وهو مطوي
+CHEVRON_OPEN, CHEVRON_CLOSED = ("chevron_left", "chevron_right") if UI_EN else ("chevron_right", "chevron_left")
+
+NO_TEXT_MSG = L("لم يتم التعرف على أي نص", "No text recognized")
+
 def save_settings():
     write_json(SETTINGS_PATH, settings)
+
+# ---- التشغيل مع Windows: قيمة في مفتاح Run تحت HKCU، ولا معنى لها عند العمل من الكود ----
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_VALUE = "OCR_Tool"
+
+def autostart_command():
+    """الأمر المسجَّل في السجل، أو None عند تشغيل الكود (لا مسار EXE بعد)."""
+    return f'"{sys.executable}"' if getattr(sys, "frozen", False) else None
+
+def read_autostart():
+    """القيمة المسجَّلة حالياً، أو None إن لم توجد."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            return winreg.QueryValueEx(key, RUN_VALUE)[0]
+    except Exception:
+        return None
+
+def set_autostart(on):
+    """يكتب القيمة أو يحذفها. تعيد نجحت العملية؟"""
+    command = autostart_command()
+    if on and not command:
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+            if on:
+                winreg.SetValueEx(key, RUN_VALUE, 0, winreg.REG_SZ, command)
+            else:
+                winreg.DeleteValue(key, RUN_VALUE)
+    except FileNotFoundError:
+        pass  # لا قيمة لحذفها، فالإلغاء محقَّق
+    except Exception:
+        return False
+    return True
+
+def sync_autostart():
+    """المستخدم نقل مجلد البرنامج: يُحدَّث المسار المسجَّل عند كل بدء."""
+    command = autostart_command()
+    if settings["autostart"] and command and read_autostart() != command:
+        settings["autostart"] = set_autostart(True)
+        save_settings()
 
 # ---- سجل النتائج: لا يُحذف منه شيء إلا بزر «مسح السجل» ----
 history = []  # أحدث نتيجة أولاً: [الوقت بصيغة ISO، النص]
@@ -583,7 +717,7 @@ def load_history():
 
 def save_history():
     if not write_json(HISTORY_PATH, history):
-        set_status("تعذّر حفظ السجل", "warn")
+        set_status(L("تعذّر حفظ السجل", "Could not save the history"), "warn")
 
 def history_stamp(iso):
     """الساعة فقط لنتائج اليوم، والتاريخ معها لما قبله."""
@@ -610,25 +744,26 @@ def add_to_history(text):
 
 def clear_history():
     if not history:
-        set_status("السجل فارغ", "info")
+        set_status(L("السجل فارغ", "History is empty"), "info")
         return
-    if not messagebox.askyesno("مسح السجل", f"حذف كل النتائج المحفوظة في السجل ({len(history)})؟\nلا يمكن التراجع عن ذلك.",
+    if not messagebox.askyesno(L("مسح السجل", "Clear history"),
+                               L(f"حذف كل النتائج المحفوظة في السجل ({len(history)})؟\nلا يمكن التراجع عن ذلك.",
+                                 f"Delete all saved results in the history ({len(history)})?\nThis cannot be undone."),
                                icon="warning", default="no", parent=root):
         return
     history.clear()
     save_history()
     refresh_history_list()
-    set_status("تم مسح السجل", "ok")
+    set_status(L("تم مسح السجل", "History cleared"), "ok")
 
 def on_history_select(event=None):
     selection = history_list.curselection()
     if not selection:
         return
     text = history[selection[0]][1]
-    original_text_area.delete("1.0", tk.END)
-    original_text_area.insert(tk.END, text)
+    show_original(text)
     copy_to_clipboard(text)
-    set_status("تم نسخ النص من السجل", "copied")
+    set_status(L("تم نسخ النص من السجل", "Text copied from the history"), "copied")
 
 def watch_show_requests():
     """نسخة ثانية شُغّلت: تُظهر نافذة هذه النسخة بدل أن تعمل بجانبها."""
@@ -636,18 +771,150 @@ def watch_show_requests():
         show_window()
     root.after(300, watch_show_requests)
 
-def setup_hotkey():
-    # مكتبة keyboard تستدعي الدالة من خيطها الخاص، فنحوّل التنفيذ إلى خيط الواجهة
+# ---- اختصار الالتقاط: يُسجَّل من settings، ويُحفظ مقبض التسجيل لحذفه عند التغيير ----
+hotkey_handle = None
+hotkey_capturing = False
+hotkey_chip: "tk.Label | None" = None  # يُنشأ مع الواجهة، ويُحدَّث نصه بعد كل تغيير
+
+def on_hotkey():
+    """مكتبة keyboard تستدعي الدالة من خيطها الخاص، فنحوّل التنفيذ إلى خيط الواجهة."""
+    root.after(0, start_capture)
+
+def register_hotkey(combo):
+    """يسجّل الاختصار. تعيد نجح التسجيل؟"""
+    global hotkey_handle
     try:
-        keyboard.add_hotkey('ctrl+shift+x', lambda: root.after(0, start_capture))
+        hotkey_handle = keyboard.add_hotkey(combo, on_hotkey)
+        return True
     except Exception:
-        set_status("تعذّر تفعيل الاختصار Ctrl+Shift+X، استخدم الزر", "warn")
+        hotkey_handle = None
+        return False
+
+def unregister_hotkey():
+    global hotkey_handle
+    if hotkey_handle is not None:
+        try:
+            keyboard.remove_hotkey(hotkey_handle)
+        except Exception:
+            pass
+        hotkey_handle = None
+
+# اختصار ثابت لقراءة آخر منطقة محددة بلا طبقة تحديد (LAST_REGION_HOTKEY أعلاه)
+last_region_handle = None
+
+def on_last_region_hotkey():
+    root.after(0, capture_last_region)
+
+def register_last_region_hotkey():
+    """تسجيله اختياري: فشله لا يمنع باقي البرنامج، ولذلك بلا رسالة."""
+    global last_region_handle
+    try:
+        last_region_handle = keyboard.add_hotkey(LAST_REGION_HOTKEY, on_last_region_hotkey)
+    except Exception:
+        last_region_handle = None
+
+def unregister_last_region_hotkey():
+    global last_region_handle
+    if last_region_handle is not None:
+        try:
+            keyboard.remove_hotkey(last_region_handle)
+        except Exception:
+            pass
+        last_region_handle = None
+
+def setup_hotkey():
+    if not register_hotkey(settings["hotkey"]):
+        set_status(L(f"تعذّر تفعيل الاختصار {pretty_hotkey(settings['hotkey'])}، استخدم زر «تغيير»",
+                     f"Could not register {pretty_hotkey(settings['hotkey'])}, use the Change button"), "warn")
+    register_last_region_hotkey()
+
+LATIN_KEYS = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+def base_scans(name):
+    """أكواد المسح الأساسية بلا بت الامتداد، لمقارنة المفاتيح التي تختلف صيغتها بين الأسماء."""
+    try:
+        return {code & 0xFF for code in keyboard.key_to_scan_codes(name)}
+    except Exception:
+        return set()
+
+def latin_hotkey(combo):
+    """الاسم بالحروف اللاتينية: المكتبة تقرأ المفتاح بحروف لغة الكيبورد (ctrl+alt+ن)، فنرجعه لمفتاحه اللاتيني بكود المسح نفسه."""
+    parts = []
+    for part in combo.split("+"):
+        if part.isascii():
+            parts.append(part)
+            continue
+        scans = base_scans(part)
+        match = next((key for key in LATIN_KEYS if scans and base_scans(key) == scans), None)
+        parts.append(match or part)
+    return "+".join(parts)
+
+def read_combo():
+    """ينتظر التركيبة التالية؛ '' إن فشل الانتظار."""
+    try:
+        return latin_hotkey(keyboard.read_hotkey(suppress=False))
+    except Exception:
+        return ""
+
+def change_hotkey():
+    """يقرأ تركيبة جديدة في خيط منفصل. نُوقف التسجيل الحالي أولاً كي لا يفتح التحديد أثناء القراءة."""
+    global hotkey_capturing
+    if hotkey_capturing:
+        return
+    hotkey_capturing = True
+    unregister_hotkey()
+    unregister_last_region_hotkey()  # وإلا قرأ آخر منطقة أثناء انتظار التركيبة الجديدة
+    set_status(L("اضغط الاختصار الجديد الآن، أو Esc للإلغاء", "Press the new shortcut now, or Esc to cancel"), "info")
+    threading.Thread(target=lambda: root.after(0, apply_hotkey, read_combo()), daemon=True).start()
+
+def apply_hotkey(combo):
+    """يثبّت التركيبة المقروءة، أو يعيد القديمة عند الإلغاء أو الرفض أو الفشل."""
+    global hotkey_capturing
+    hotkey_capturing = False
+    old = settings["hotkey"]
+    problem = None
+    if combo in ("", "esc"):
+        problem = (L("أُلغي تغيير الاختصار", "Shortcut change cancelled"), "info")
+    elif not valid_hotkey(combo):
+        problem = (L("لا يُقبل اختصار بلا مفتاح تعديل (Ctrl أو Alt أو Shift)", "Use a modifier key as well (Ctrl, Alt or Shift)"), "warn")
+    elif same_hotkey(combo, LAST_REGION_HOTKEY):
+        problem = (L(f"{pretty_hotkey(LAST_REGION_HOTKEY)} محفوظ لقراءة آخر منطقة، اختر غيره",
+                     f"{pretty_hotkey(LAST_REGION_HOTKEY)} is reserved for reading the last region, choose another"), "warn")
+    elif not register_hotkey(combo):
+        problem = (L("تعذّر تسجيل الاختصار الجديد، بقي القديم", "Could not register the new shortcut, the old one is kept"), "warn")
+    if problem:
+        register_hotkey(old)
+        register_last_region_hotkey()
+        set_status(*problem)
+        return
+    settings["hotkey"] = combo
+    save_settings()
+    register_last_region_hotkey()
+    if hotkey_chip is not None:
+        hotkey_chip.config(text=pretty_hotkey(combo))
+    set_status(L(f"صار الاختصار {pretty_hotkey(combo)}", f"Shortcut is now {pretty_hotkey(combo)}"), "ok")
+
+def switch_ui_language():
+    """يحفظ اللغة الأخرى ثم يعيد تشغيل البرنامج، لأن اتجاه الواجهة كله يُبنى مرة عند البدء."""
+    settings["ui"] = "ar" if UI_EN else "en"
+    save_settings()
+    # نحرّر قفل النسخة الواحدة أولاً، وإلا ترى النسخة الجديدة هذه النسخة فتخرج
+    for handle in (_instance_mutex, show_event):
+        if handle:
+            kernel32.CloseHandle(handle)
+    script = [] if getattr(sys, "frozen", False) else [os.path.abspath(__file__)]
+    try:
+        subprocess.Popen([sys.executable, *script, "--show"])
+    except Exception as e:
+        set_status(L(f"تعذّرت إعادة التشغيل: {e}", f"Could not restart: {e}"), "error")
+        return
+    quit_app()
 
 # ========================================================
 # 4. الواجهة الرسومية
 # ========================================================
 root = tk.Tk()
-root.title(f"أداة قراءة النصوص OCR المتقدمة - {APP_VERSION}")
+root.title(L(f"أداة قراءة النصوص OCR المتقدمة - {APP_VERSION}", f"Advanced OCR Text Reader - {APP_VERSION}"))
 SCALE = root.winfo_fpixels("1i") / 96  # نسبة تكبير الشاشة (1.5 مثلاً عند 150%)
 
 def px(v):
@@ -672,6 +939,20 @@ def reg(widget, **opts):
     widget.configure(**{k: T[v] for k, v in opts.items()})
     return widget
 
+# شريط تمرير ttk على ثيم clam: شريط Windows الافتراضي يتجاهل الألوان فيبقى أبيض في الثيم الداكن
+style = ttk.Style(root)
+style.theme_use("clam")
+SCROLLBAR_STYLE = "Theme.Vertical.TScrollbar"
+
+def theme_scrollbar(box):
+    """يستبدل شريط ScrolledText بشريط ttk يتبع ألوان الثيم، في مكانه نفسه (يمين المربع)."""
+    box.vbar.destroy()
+    bar = ttk.Scrollbar(box.frame, orient="vertical", command=box.yview, style=SCROLLBAR_STYLE)
+    bar.pack(side="right", fill="y")
+    box.vbar = bar
+    box.configure(yscrollcommand=bar.set)
+    return bar
+
 def icon_label(parent, name, size, color_key, **pack_opts):
     lbl = tk.Label(parent, image=ui_icons.tk_icon(name, px(size), T[color_key]))
     reg(lbl, bg="bg")
@@ -695,6 +976,9 @@ def apply_theme(mode):
     T.clear()
     T.update(THEMES[mode])
     root.configure(bg=T["bg"])
+    style.configure(SCROLLBAR_STYLE, background=T["surface"], troughcolor=T["bg"], bordercolor=T["border"],
+                    arrowcolor=T["muted"], lightcolor=T["surface"], darkcolor=T["surface"])
+    style.map(SCROLLBAR_STYLE, background=[("active", T["select"])], arrowcolor=[("active", T["ink"])])
     for widget, opts in _themed:
         widget.configure(**{k: T[v] for k, v in opts.items()})
     for lbl, name, size, color_key in _icon_labels:
@@ -721,8 +1005,8 @@ def style_button(btn):
 
 btn_capture = tk.Button(
     main_frame,
-    text="  تحديد وقص الشاشة",
-    image=ui_icons.tk_icon("capture", px(22), "#FFFFFF"), compound="right",
+    text="  " + L("تحديد وقص الشاشة", "Select screen area"),
+    image=ui_icons.tk_icon("capture", px(22), "#FFFFFF"), compound=SIDE,
     command=start_capture,
     fg='white',
     font=(FONT, 13, 'bold'), relief='flat', bd=0, pady=px(8), cursor="hand2"
@@ -731,20 +1015,26 @@ style_button(btn_capture)
 btn_capture.pack(fill='x', pady=(0, px(8)))
 
 def add_hint(parent, label, key):
-    """نص عربي ثم اختصار لوحة مفاتيح داخل شريحة؛ يُرتَّب من اليمين."""
-    reg(tk.Label(parent, text=label, font=(FONT, 11)), bg="bg", fg="muted").pack(side='right', padx=(px(10), px(4)))
-    reg(tk.Label(parent, text=key, font=("Consolas", 10), padx=px(6), pady=px(1), highlightthickness=1),
-        bg="surface", fg="ink", highlightbackground="border").pack(side='right')
+    """«للإلغاء Esc» بالعربية، و«Esc to cancel» بالإنجليزية؛ الاختصار داخل شريحة، من بداية السطر."""
+    text = reg(tk.Label(parent, text=label, font=(FONT, 11)), bg="bg", fg="muted")
+    chip = reg(tk.Label(parent, text=key, font=("Consolas", 10), padx=px(6), pady=px(1), highlightthickness=1),
+               bg="surface", fg="ink", highlightbackground="border")
+    if UI_EN:
+        chip.pack(side=SIDE, padx=(px(10), 0))
+        text.pack(side=SIDE, padx=(px(4), 0))
+    else:
+        text.pack(side=SIDE, padx=(px(10), px(4)))
+        chip.pack(side=SIDE)
 
 hint_frame = reg(tk.Frame(main_frame), bg="bg")
-hint_frame.pack(anchor='e', pady=(0, px(12)))
+hint_frame.pack(anchor=ANCHOR, pady=(0, px(12)))
 
 def collapse_arrow(parent, content, key):
-    """سهم بين العنوان ومحتواه: يطوي المحتوى (يساره) أو يعيده. يُستدعى بعد إنشاء العنوان والمحتوى.
+    """سهم بين العنوان ومحتواه: يطوي المحتوى (بعده في السطر) أو يعيده. يُستدعى بعد إنشاء العنوان والمحتوى.
 
     key: اسم السطر في settings["collapsed"]، فتبقى حالته بين التشغيلات."""
     arrow = reg(tk.Label(parent, cursor="hand2"), bg="bg")
-    entry = [arrow, "chevron_right", 16, "muted"]  # قائمة لا صف: الاسم واللون يتغيران، وapply_theme يقرأ الحالي
+    entry = [arrow, CHEVRON_OPEN, 16, "muted"]  # قائمة لا صف: الاسم واللون يتغيران، وapply_theme يقرأ الحالي
     _icon_labels.append(entry)
 
     def paint(color_key):
@@ -754,10 +1044,10 @@ def collapse_arrow(parent, content, key):
     def toggle(event=None):
         if content.winfo_manager():
             content.pack_forget()
-            entry[1] = "chevron_left"
+            entry[1] = CHEVRON_CLOSED
         else:
-            content.pack(side='right')
-            entry[1] = "chevron_right"
+            content.pack(side=SIDE)
+            entry[1] = CHEVRON_OPEN
         paint("primary")
         settings["collapsed"][key] = not content.winfo_manager()
         save_settings()
@@ -766,38 +1056,73 @@ def collapse_arrow(parent, content, key):
     arrow.bind("<Enter>", lambda e: paint("primary"))
     arrow.bind("<Leave>", lambda e: paint("muted"))
     paint("muted")
-    arrow.pack(side='right', padx=(px(4), px(2)))
+    arrow.pack(side=SIDE, padx=mirror((px(4), px(2))))
     if settings["collapsed"].get(key):
-        entry[1] = "chevron_left"
+        entry[1] = CHEVRON_CLOSED
         paint("muted")
     else:
-        content.pack(side='right')
+        content.pack(side=SIDE)
     return arrow
 
-reg(tk.Label(hint_frame, text="اختصار التحديد", font=(FONT, 11)), bg="bg", fg="muted").pack(side='right')
+reg(tk.Label(hint_frame, text=L("اختصار التحديد", "Capture shortcut"), font=(FONT, 11)), bg="bg", fg="muted").pack(side=SIDE)
 hint_content = reg(tk.Frame(hint_frame), bg="bg")
-reg(tk.Label(hint_content, text="Ctrl+Shift+X", font=("Consolas", 10), padx=px(6), pady=px(1), highlightthickness=1),
-    bg="surface", fg="ink", highlightbackground="border").pack(side='right')
-add_hint(hint_content, "للإلغاء", "Esc")
+hotkey_chip = reg(tk.Label(hint_content, text=pretty_hotkey(settings["hotkey"]), font=("Consolas", 10),
+                           padx=px(6), pady=px(1), highlightthickness=1),
+                  bg="surface", fg="ink", highlightbackground="border")
+hotkey_chip.pack(side=SIDE)
+btn_change_hotkey = tk.Button(hint_content, text=L("تغيير", "Change"), font=(FONT, 10), relief='flat', bd=0,
+                              padx=px(6), pady=px(1), highlightthickness=1, cursor="hand2", command=change_hotkey)
+reg(btn_change_hotkey, bg="surface", fg="ink", activebackground="select", activeforeground="ink",
+    highlightbackground="border", highlightcolor="primary")
+btn_change_hotkey.pack(side=SIDE, padx=mirror((px(4), 0)))
+add_hint(hint_content, L("للإلغاء", "to cancel"), "Esc")
 collapse_arrow(hint_frame, hint_content, "hints")
 
 lang_frame = reg(tk.Frame(main_frame), bg="bg")
-lang_frame.pack(anchor='e', pady=(0, 8))
+lang_frame.pack(anchor=ANCHOR, pady=(0, 8))
 lang_var = tk.StringVar(value=settings["lang"])
 lang_var.trace_add("write", lambda *_: (settings.update(lang=lang_var.get()), save_settings()))
-icon_label(lang_frame, "globe", 18, "muted", side='right', padx=(6, 0))
-reg(tk.Label(lang_frame, text="لغة القراءة", font=(FONT, 11, 'bold')), bg="bg", fg="ink").pack(side='right')
+icon_label(lang_frame, "languages", 18, "muted", side=SIDE, padx=mirror((6, 0)))
+reg(tk.Label(lang_frame, text=L("لغة القراءة", "Reading language"), font=(FONT, 11, 'bold')), bg="bg", fg="ink").pack(side=SIDE)
 lang_content = reg(tk.Frame(lang_frame), bg="bg")
-for label, value in zip(("عربي + إنجليزي", "عربي فقط", "إنجليزي فقط"), LANG_VALUES):
+for label, value in zip(L(("عربي + إنجليزي", "عربي فقط", "إنجليزي فقط"),
+                          ("Arabic + English", "Arabic only", "English only")), LANG_VALUES):
     reg(tk.Radiobutton(
         lang_content, text=label, value=value, variable=lang_var,
         font=(FONT, 11), highlightthickness=0, cursor="hand2"
-    ), bg="bg", fg="ink", activebackground="bg", activeforeground="primary", selectcolor="surface").pack(side='right', padx=6)
+    ), bg="bg", fg="ink", activebackground="bg", activeforeground="primary", selectcolor="surface").pack(side=SIDE, padx=6)
 collapse_arrow(lang_frame, lang_content, "lang")
 
+# التشغيل مع Windows: يُسجَّل مسار EXE في مفتاح Run، ويعود المربع لحاله إن فشل التسجيل
+autostart_var = tk.BooleanVar(value=settings["autostart"])
+autostart_frame = reg(tk.Frame(main_frame), bg="bg")
+autostart_frame.pack(anchor=ANCHOR, pady=(0, px(8)))
+
+def toggle_autostart():
+    on = autostart_var.get()
+    if not set_autostart(on):
+        autostart_var.set(not on)
+        set_status(L("تعذّر تعديل إعداد التشغيل مع Windows", "Could not change the Start with Windows setting"), "warn")
+        return
+    settings["autostart"] = on
+    save_settings()
+    set_status(L("سيعمل مع Windows عند تسجيل الدخول" if on else "لن يعمل مع Windows عند تسجيل الدخول",
+                 "Will start with Windows at sign-in" if on else "Will not start with Windows at sign-in"), "ok")
+
+autostart_box = reg(tk.Checkbutton(
+    autostart_frame, text="  " + L("التشغيل مع Windows", "Start with Windows"), variable=autostart_var,
+    command=toggle_autostart, font=(FONT, 11), highlightthickness=0, cursor="hand2"
+), bg="bg", fg="ink", activebackground="bg", activeforeground="primary", selectcolor="surface")
+autostart_box.pack(side=SIDE)
+if not autostart_command():  # من الكود لا مسار EXE يُسجَّل، فنوضّح ذلك بجانب المربع
+    autostart_box.config(state="disabled", cursor="arrow")
+    reg(autostart_box, disabledforeground="muted")  # نص المربع المعطَّل يتبع الثيم
+    reg(tk.Label(autostart_frame, text=L("من نسخة EXE فقط", "Built app only"), font=(FONT, 10)),
+        bg="bg", fg="muted").pack(side=SIDE, padx=px(6))
+
 def secondary_button(parent, text, icon, command):
-    """زر ثانوي بإطار رفيع (أخف من زر التحديد الرئيسي)، يُرتَّب من اليمين."""
-    btn = tk.Button(parent, text="  " + text, command=command, font=(FONT, 11), compound="right",
+    """زر ثانوي بإطار رفيع (أخف من زر التحديد الرئيسي)، يُرتَّب من بداية السطر."""
+    btn = tk.Button(parent, text="  " + text, command=command, font=(FONT, 11), compound=SIDE,
                     image=ui_icons.tk_icon(icon, px(16), T["ink"]), relief='flat', bd=0,
                     padx=px(10), pady=px(3), highlightthickness=1, cursor="hand2", takefocus=True)
     reg(btn, bg="surface", fg="ink", activebackground="select", activeforeground="ink",
@@ -805,30 +1130,34 @@ def secondary_button(parent, text, icon, command):
     _icon_labels.append((btn, icon, 16, "ink"))  # تتبدّل أيقونته مع الثيم
     btn.bind("<Enter>", lambda e: btn.config(bg=T["select"]))
     btn.bind("<Leave>", lambda e: btn.config(bg=T["surface"]))
-    btn.pack(side='right', padx=(px(8), 0))
+    btn.pack(side=SIDE, padx=mirror((px(8), 0)))
     return btn
 
 actions_frame = reg(tk.Frame(main_frame), bg="bg")
-actions_frame.pack(anchor='e', pady=(0, px(10)))
-btn_clipboard = secondary_button(actions_frame, "قراءة صورة من الحافظة", "copy", ocr_from_clipboard)
-btn_translate = secondary_button(actions_frame, "ترجمة", "globe", translate_all)
-btn_search = secondary_button(actions_frame, "بحث", "search", search_all)
+actions_frame.pack(anchor=ANCHOR, pady=(0, px(10)))
+btn_clipboard = secondary_button(actions_frame, L("قراءة صورة من الحافظة", "Read image from clipboard"), "copy", ocr_from_clipboard)
+btn_translate = secondary_button(actions_frame, L("ترجمة", "Translate"), "globe", translate_all)
+btn_search = secondary_button(actions_frame, L("بحث", "Search"), "search", search_all)
+# اسم اللغة الأخرى بلغتها، ليجده من لا يقرأ لغة الواجهة الحالية
+btn_ui_lang = secondary_button(actions_frame, L("English", "العربية"), "language", switch_ui_language)
 
-status_label = reg(tk.Label(main_frame, text="جاهز للاستخدام", font=(FONT, 11), padx=2), bg="bg", fg="muted")
-status_label.pack(anchor='e', pady=(0, 10))
+current_status = (L("جاهز للاستخدام", "Ready"), "info")
+status_label = reg(tk.Label(main_frame, text=current_status[0], font=(FONT, 11), padx=2), bg="bg", fg="muted")
+status_label.pack(anchor=ANCHOR, pady=(0, 10))
 
 history_frame = reg(tk.Frame(main_frame), bg="bg")
 history_frame.pack(side='bottom', fill='x', pady=(12, 0))
 history_header = reg(tk.Frame(history_frame), bg="bg")
 history_header.pack(fill='x', pady=(0, 4))
-icon_label(history_header, "history", 16, "muted", side='right', padx=(6, 0))
-reg(tk.Label(history_header, text="آخر النتائج (اضغط على نتيجة لعرضها ونسخها)", font=(FONT, 10)),
-    bg="bg", fg="muted").pack(side='right', padx=(0, 6))
-btn_clear_history = secondary_button(history_header, "مسح السجل", "trash", clear_history)
-btn_clear_history.pack_configure(side='left', padx=0)  # في الطرف المقابل لعنوان السجل
+icon_label(history_header, "history", 16, "muted", side=SIDE, padx=mirror((6, 0)))
+reg(tk.Label(history_header, text=L("آخر النتائج (اضغط على نتيجة لعرضها ونسخها)", "Recent results (click one to view and copy it)"),
+             font=(FONT, 10)), bg="bg", fg="muted").pack(side=SIDE, padx=mirror((0, 6)))
+btn_clear_history = secondary_button(history_header, L("مسح السجل", "Clear history"), "trash", clear_history)
+btn_clear_history.pack_configure(side=END_SIDE, padx=0)  # في الطرف المقابل لعنوان السجل
 history_list = reg(tk.Listbox(
     history_frame, height=5, font=(FONT, 11), activestyle='none', exportselection=False,
-    relief='flat', bd=0, highlightthickness=1, selectforeground="white"
+    relief='flat', bd=0, highlightthickness=1, selectforeground="white",
+    justify="right" if not UI_EN else "left"  # العربية من اليمين، والإنجليزية تبقى على اليسار
 ), bg="surface", fg="ink", highlightbackground="border", highlightcolor="primary", selectbackground="primary")
 history_list.pack(fill='x')
 history_list.bind("<<ListboxSelect>>", on_history_select)
@@ -841,12 +1170,14 @@ original_text_area = reg(scrolledtext.ScrolledText(
 ), bg="surface", fg="ink", highlightbackground="border", highlightcolor="primary",
    selectbackground="select", selectforeground="ink", insertbackground="ink")
 original_text_area.pack(fill='both', expand=True)
+original_text_area.tag_configure("rtl", justify="right")  # يُطبَّق في show_original حسب لغة النص
+theme_scrollbar(original_text_area)
 
-# مربع الترجمة: للقراءة فقط، ويظهر يسار النص الأصلي بنصف العرض بعد أول ترجمة (show_translation)
+# مربع الترجمة: للقراءة فقط، ويظهر بعد النص الأصلي (يساره في العربية) بنصف العرض بعد أول ترجمة (show_translation)
 translation_frame = reg(tk.Frame(main_frame), bg="bg")
 translation_frame.pack_propagate(False)  # عرضه يُضبط بنصف المساحة، لا بحجم محتواه
-translation_label = reg(tk.Label(translation_frame, text="الترجمة", font=(FONT, 10)), bg="bg", fg="muted")
-translation_label.pack(anchor='e', pady=(0, px(4)))
+translation_label = reg(tk.Label(translation_frame, text=L("الترجمة", "Translation"), font=(FONT, 10)), bg="bg", fg="muted")
+translation_label.pack(anchor=ANCHOR, pady=(0, px(4)))
 translation_area = reg(scrolledtext.ScrolledText(
     translation_frame, wrap=tk.WORD, font=(FONT, 13), width=1, height=1, relief='flat', bd=0,
     padx=px(14), pady=px(12), highlightthickness=1, state="disabled"
@@ -854,6 +1185,7 @@ translation_area = reg(scrolledtext.ScrolledText(
    selectbackground="select", selectforeground="ink", insertbackground="ink")
 translation_area.tag_configure("rtl", justify="right")
 translation_area.pack(fill='both', expand=True)
+theme_scrollbar(translation_area)
 main_frame.bind("<Configure>", lambda e: translation_frame.config(width=(e.width - px(48)) // 2), add="+")
 
 # ---- نافذة التظليل: تظليل نص بالفأرة يُظهر نسخ / ترجمة / بحث للجزء المظلَّل فقط ----
@@ -876,7 +1208,7 @@ def on_selection_action(action):
         return
     if action == "copy":
         copy_to_clipboard(text)
-        set_status("تم نسخ النص المحدد", "copied")
+        set_status(L("تم نسخ النص المحدد", "Selected text copied"), "copied")
     elif action == "translate":
         translate_text(text)
     else:
@@ -890,15 +1222,16 @@ def build_selection_popup():
     pop.attributes("-topmost", True)
     box = reg(tk.Frame(pop, highlightthickness=1, padx=px(3), pady=px(3)), bg="surface", highlightbackground="border")
     box.pack()
-    for label, icon, action in (("نسخ", "copy", "copy"), ("ترجمة", "globe", "translate"), ("بحث", "search", "search")):
-        btn = tk.Button(box, text=" " + label, image=ui_icons.tk_icon(icon, px(15), T["ink"]), compound="right",
+    for label, icon, action in ((L("نسخ", "Copy"), "copy", "copy"), (L("ترجمة", "Translate"), "globe", "translate"),
+                                (L("بحث", "Search"), "search", "search")):
+        btn = tk.Button(box, text=" " + label, image=ui_icons.tk_icon(icon, px(15), T["ink"]), compound=SIDE,
                         font=(FONT, 10), relief="flat", bd=0, padx=px(8), pady=px(2), cursor="hand2",
                         command=lambda a=action: on_selection_action(a))
         reg(btn, bg="surface", fg="ink", activebackground="select", activeforeground="ink")
         _icon_labels.append((btn, icon, 15, "ink"))
         btn.bind("<Enter>", lambda e, b=btn: b.config(bg=T["select"]))
         btn.bind("<Leave>", lambda e, b=btn: b.config(bg=T["surface"]))
-        btn.pack(side="right")
+        btn.pack(side=SIDE)
     selection_popup = pop
 
 def show_selection_popup(x_root, y_root):
@@ -943,17 +1276,22 @@ apply_theme(system_theme())
 root.after(2000, watch_system_theme)
 
 def check_tesseract():
-    """رسالة المشكلة إن كان Tesseract أو إحدى حزمتي اللغة (ara/eng) غير مثبّت، وإلا None."""
+    """رسالة المشكلة إن كان Tesseract أو إحدى حزمتي اللغة (ara/eng) ناقصًا، وإلا None."""
     if not TESSERACT_PATH:
-        return "لم يتم العثور على Tesseract. ثبّته في C:\\Program Files\\Tesseract-OCR"
+        return L("لم يتم العثور على Tesseract المرفق. أعد تثبيت البرنامج، أو ثبّت Tesseract في C:\\Program Files\\Tesseract-OCR",
+                 "The bundled Tesseract was not found. Reinstall the app, or install Tesseract in C:\\Program Files\\Tesseract-OCR")
     try:
         installed = pytesseract.get_languages()
     except Exception:
         return None  # لا نمنع العمل بسبب فشل الفحص نفسه
-    missing = [name for code, name in (("ara", "العربية"), ("eng", "الإنجليزية")) if code not in installed]
+    missing = [name for code, name in (("ara", L("العربية", "Arabic")), ("eng", L("الإنجليزية", "English")))
+               if code not in installed]
     if missing:
-        what = f"حزمة اللغة {missing[0]} غير مثبّتة" if len(missing) == 1 else "حزمتا اللغتين العربية والإنجليزية غير مثبّتتين"
-        return f"{what} في Tesseract. أعد تثبيته واختر اللغة من Additional language data"
+        if UI_EN:
+            what = f"The {missing[0]} language data is" if len(missing) == 1 else "The Arabic and English language data are"
+            return f"{what} missing from the bundled Tesseract. Reinstall the app"
+        what = f"حزمة اللغة {missing[0]} ناقصة" if len(missing) == 1 else "حزمتا اللغتين العربية والإنجليزية ناقصتان"
+        return f"{what} في Tesseract المرفق. أعد تثبيت البرنامج"
     return None
 
 startup_problem = check_tesseract()
@@ -961,6 +1299,7 @@ if startup_problem:
     set_status(startup_problem, "error")
 
 if __name__ == "__main__":
+    sync_autostart()
     setup_hotkey()
     setup_tray()
     watch_show_requests()
@@ -969,5 +1308,6 @@ if __name__ == "__main__":
         hide_to_tray()
         if startup_problem:  # الإخفاء يكتب حالة «يعمل في الخلفية»، فنعيد رسالة المشكلة ونُشعر بها
             set_status(startup_problem, "error")
-        root.after(1500, lambda: notify_if_hidden(startup_problem or "يعمل في الخلفية. اضغط Ctrl+Shift+X لالتقاط نص"))
+        root.after(1500, lambda: notify_if_hidden(startup_problem or L(f"يعمل في الخلفية. اضغط {pretty_hotkey(settings['hotkey'])} لالتقاط نص",
+                                                                         f"Running in the background. Press {pretty_hotkey(settings['hotkey'])} to capture text")))
     root.mainloop()
