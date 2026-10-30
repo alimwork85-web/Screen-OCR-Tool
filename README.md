@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="OCR Tool 2.3.0" width="100%">
+<img src="docs/banner.svg" alt="OCR Tool 2.3.1" width="100%">
 
-![version](https://img.shields.io/badge/version-2.3.0-0E7C86)
-![platform](https://img.shields.io/badge/platform-Windows-0A4563)
-![python](https://img.shields.io/badge/python-3.14-F5B544)
-![ocr](https://img.shields.io/badge/OCR-Tesseract%205-149AA3)
-![languages](https://img.shields.io/badge/languages-Arabic%20%7C%20English-12212B)
+![version](https://img.shields.io/badge/version-2.3.1-E5352B)
+![platform](https://img.shields.io/badge/platform-Windows-0F0F0F)
+![python](https://img.shields.io/badge/python-3.14-3776AB)
+![ocr](https://img.shields.io/badge/OCR-Tesseract%205-0F0F0F)
+![languages](https://img.shields.io/badge/languages-Arabic%20%7C%20English-0F0F0F)
 ![translate](https://img.shields.io/badge/translate-Google%20%7C%20Ollama-6B4FBB)
-![developer](https://img.shields.io/badge/developer-Ali%20Alhumedi-0A4563)
+![developer](https://img.shields.io/badge/developer-Ali%20Alhumedi-0F0F0F)
 
 **[English](#-english) · [العربية](#-العربية)**
 
@@ -20,7 +20,7 @@
 
 # 🇬🇧 English
 
-## About
+<h2><img src="docs/headings/h2-about-en.svg" alt="About" width="100%"></h2>
 
 **OCR Tool** is a small Windows app that turns any text you see on screen into copyable text. Press `Ctrl+Shift+X`, drag over the area, and the text (Arabic and English) is extracted and copied to your clipboard, ready to paste.
 
@@ -28,12 +28,16 @@ Handy for text inside images, scanned PDFs, videos, apps that don't let you sele
 
 Recognition runs **locally on your machine** through the Tesseract engine. Text goes online only when you press **Translate** (to Google); without a connection it is translated locally with [Ollama](https://ollama.com) if installed.
 
+<h2><img src="docs/headings/h2-shots-en.svg" alt="Screenshots" width="100%"></h2>
+
 <p align="center">
-  <img src="docs/screenshots/ui-en-dark.png" alt="UI - dark theme" width="48%">
-  <img src="docs/screenshots/ui-en-light.png" alt="UI - light theme" width="48%">
+  <img src="docs/screenshots/ui-en-light.png" alt="English UI - light theme" width="48%">
+  <img src="docs/screenshots/ui-en-dark.png" alt="English UI - dark theme" width="48%">
 </p>
 
-## Features
+<p align="center"><img src="docs/screenshots/ui-dark-warning.png" alt="Warning state: no text found (Arabic UI, dark theme)" width="48%"></p>
+
+<h2><img src="docs/headings/h2-features-en.svg" alt="Features" width="100%"></h2>
 
 | Feature | Details |
 |---|---|
@@ -57,7 +61,7 @@ Recognition runs **locally on your machine** through the Tesseract engine. Text 
 | 🔁 **Arabic or English UI** | The **English** button switches the interface to a left-to-right English layout (the **العربية** button switches back); the app restarts itself and remembers your choice |
 | 📐 **Display scaling** | Handles display scaling (tested at 150%) |
 
-## How it works
+<h2><img src="docs/headings/h2-how-en.svg" alt="How it works" width="100%"></h2>
 
 ```mermaid
 flowchart LR
@@ -68,7 +72,7 @@ flowchart LR
     E --> F["Clipboard<br/>+ history + notification"]
 ```
 
-## Usage
+<h2><img src="docs/headings/h2-usage-en.svg" alt="Usage" width="100%"></h2>
 
 1. Launch the app. It disappears right away and settles in the notification area (you may need the `^` arrow to see hidden icons). A small notification confirms it is ready.
 2. Press `Ctrl+Shift+X` from any app.
@@ -81,25 +85,27 @@ flowchart LR
 
 > ⏳ **Note:** the first launch of a freshly built EXE can take several seconds before the hotkey becomes active. Wait for the "running in the background" notification.
 
-## Requirements
+<h2><img src="docs/headings/h2-requirements-en.svg" alt="Requirements" width="100%"></h2>
 
 - **Windows** (tested on Windows 11).
 - **[Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)** is bundled in the `tesseract` folder with the **`ara`** and **`eng`** language packs, so nothing needs to be installed. When running from source, `vendor/tesseract` is used if present; otherwise `C:\Program Files\Tesseract-OCR` or `PATH`.
 - **Optional:** [Ollama](https://ollama.com) with a model such as `gemma3:4b` (`ollama pull gemma3:4b`) for offline translation.
 
-## Running
+<h2><img src="docs/headings/h2-running-en.svg" alt="Running" width="100%"></h2>
 
-**Option 1: the prebuilt app** (no Python needed):
-download `OCR-Tool-2.3.0-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (Tesseract is bundled, nothing to install.)
+<h3><img src="docs/headings/h3-prebuilt-en.svg" alt="Option 1: the prebuilt app" width="100%"></h3>
 
-**Option 2: from source:**
+(no Python needed)
+download `OCR-Tool-2.3.1-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (Tesseract is bundled, nothing to install.)
+
+<h3><img src="docs/headings/h3-source-en.svg" alt="Option 2: from source" width="100%"></h3>
 
 ```bash
 py -3.14 -m pip install -r requirements.txt
 py -3.14 ocr_tool.py
 ```
 
-**Build the EXE yourself:**
+<h3><img src="docs/headings/h3-build-en.svg" alt="Build the EXE yourself" width="100%"></h3>
 
 ```bash
 py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
@@ -111,7 +117,7 @@ The `vendor/tesseract` folder is tracked in the repository (~72MB), so no local 
 py -3.14 tools/prepare_tesseract.py
 ```
 
-Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.3.0 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
+Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.3.1 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
 
 **Run the tests:**
 
@@ -126,7 +132,7 @@ py -3.14 -m pytest
 py -3.14 tools/make_assets.py
 ```
 
-## Project layout
+<h2><img src="docs/headings/h2-layout-en.svg" alt="Project layout" width="100%"></h2>
 
 ```
 ocr_tool.py          main program (UI, selection, OCR, tray)
@@ -137,11 +143,11 @@ tools/make_assets.py app icon and SVG generator
 assets/              icons (SVG/PNG/ICO) and fonts
 docs/                banner and screenshots
 ocr_tool.spec        PyInstaller build settings
-version_info.txt     EXE version metadata (2.3.0)
+version_info.txt     EXE version metadata (2.3.1)
 requirements.txt     Python packages
 ```
 
-## Troubleshooting
+<h2><img src="docs/headings/h2-trouble-en.svg" alt="Troubleshooting" width="100%"></h2>
 
 | Problem | Fix |
 |---|---|
@@ -153,12 +159,20 @@ requirements.txt     Python packages
 | Translation does not work | It needs an internet connection, or Ollama running with a model (e.g. `ollama pull gemma3:4b`). The first local translation can take about 15 seconds while the model loads |
 | "language data missing" message | Extract the full archive again; the language packs are bundled in `tesseract\tessdata` |
 
-## Known limitations
+<h2><img src="docs/headings/h2-limits-en.svg" alt="Known limitations" width="100%"></h2>
 
 - Windows only.
 - Arabic accuracy depends on image quality and font, and on the Tesseract engine.
 - Punctuation in lines that mix Arabic and English may look misplaced inside the text boxes (a Tkinter limit), but the copied text is correct.
 - Google translation sends the text online, and only when you press Translate.
+
+<h2><img src="docs/headings/h2-new-en.svg" alt="What's new" width="100%"></h2>
+
+## What's new in 2.3.1
+
+- **Bottom row:** *Start with Windows* now sits below the history, with a *Read last region* hint (`Ctrl+Shift+Z`) at the other end.
+- **README:** a new banner, icon section headings and screenshots of the current interface.
+- **Chart and social preview:** the performance chart and the repository preview use the new colours.
 
 ## What's new in 2.3.0
 
@@ -218,11 +232,11 @@ requirements.txt     Python packages
 - Better recognition: downscaling large text and a retry mode.
 - Fixes: window restored after a failed capture, no double overlays, UI no longer freezes while reading, error messages are not copied to the clipboard, and `Esc` works from any app.
 
-## Credits
+<h2><img src="docs/headings/h2-credits-en.svg" alt="Credits" width="100%"></h2>
 
 [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) · [Pillow](https://python-pillow.org/) · [pytesseract](https://github.com/madmaze/pytesseract) · [keyboard](https://github.com/boppreh/keyboard) · [pystray](https://github.com/moses-palmer/pystray) · [PyInstaller](https://pyinstaller.org/) · [Tajawal](https://fonts.google.com/specimen/Tajawal) font under the SIL Open Font License (`assets/fonts/OFL-Tajawal.txt`). Tesseract and the bundled language packs are licensed under Apache-2.0 (`THIRD_PARTY_LICENSES.txt`).
 
-## License
+<h2><img src="docs/headings/h2-license-en.svg" alt="License" width="100%"></h2>
 
 Developed and published by **Ali Alhumedi**. © 2026 Ali Alhumedi.
 
@@ -234,7 +248,7 @@ Developed and published by **Ali Alhumedi**. © 2026 Ali Alhumedi.
 
 # 🇸🇦 العربية
 
-## نبذة عن البرنامج
+<h2><img src="docs/headings/h2-about-ar.svg" alt="نبذة عن البرنامج" width="100%"></h2>
 
 **أداة قراءة النصوص من الشاشة (OCR Tool)** برنامج صغير لنظام Windows يحوّل أي نص تراه على الشاشة إلى نص قابل للنسخ. ضغطة واحدة على `Ctrl+Shift+X`، تحدّد المنطقة بالفأرة، فيُستخرج النص (عربي وإنجليزي) ويُنسخ إلى الحافظة مباشرة، جاهزاً للصق.
 
@@ -242,12 +256,16 @@ Developed and published by **Ali Alhumedi**. © 2026 Ali Alhumedi.
 
 القراءة تتم **محلياً على جهازك** عبر محرك Tesseract. لا يُرسل النص إلى الإنترنت إلا عند ضغطك زر **ترجمة** (إلى Google)، وإن لم يتوفر الاتصال يُترجم محلياً عبر [Ollama](https://ollama.com) إن كان مثبّتاً.
 
+<h2><img src="docs/headings/h2-shots-ar.svg" alt="لقطات الواجهة" width="100%"></h2>
+
 <p align="center">
-  <img src="docs/screenshots/ui-dark.png" alt="الواجهة - الثيم الداكن" width="48%">
   <img src="docs/screenshots/ui-light.png" alt="الواجهة - الثيم الفاتح" width="48%">
+  <img src="docs/screenshots/ui-dark.png" alt="الواجهة - الثيم الداكن" width="48%">
 </p>
 
-## المميزات
+<p align="center"><img src="docs/screenshots/ui-dark-warning.png" alt="حالة التنبيه: لا يوجد نص (الثيم الداكن)" width="48%"></p>
+
+<h2><img src="docs/headings/h2-features-ar.svg" alt="المميزات" width="100%"></h2>
 
 | الميزة | التفاصيل |
 |---|---|
@@ -271,7 +289,7 @@ Developed and published by **Ali Alhumedi**. © 2026 Ali Alhumedi.
 | 🔁 **واجهة عربية أو إنجليزية** | زر **English** يحوّل الواجهة إلى الإنجليزية من اليسار لليمين (وزر **العربية** يعيدها)، ويُعاد تشغيل البرنامج تلقائياً ويتذكر اختيارك |
 | 📐 **يدعم تكبير الشاشة** | يتعامل مع تكبير الشاشة (اختُبر على 150%) |
 
-## كيف يعمل
+<h2><img src="docs/headings/h2-how-ar.svg" alt="كيف يعمل" width="100%"></h2>
 
 ```mermaid
 flowchart LR
@@ -282,7 +300,7 @@ flowchart LR
     E --> F["نسخ للحافظة<br/>+ سجل + إشعار"]
 ```
 
-## طريقة الاستخدام
+<h2><img src="docs/headings/h2-usage-ar.svg" alt="طريقة الاستخدام" width="100%"></h2>
 
 1. شغّل البرنامج. سيختفي فوراً ويستقر في منطقة الإشعارات (قد تحتاج للضغط على السهم `^` لرؤية الأيقونات المخفية). يظهر إشعار صغير يؤكد أنه جاهز.
 2. اضغط `Ctrl+Shift+X` من أي برنامج.
@@ -295,25 +313,27 @@ flowchart LR
 
 > ⏳ **ملاحظة:** أول تشغيل لملف EXE جديد قد يستغرق عدة ثوانٍ قبل أن يصبح الاختصار فعّالاً. انتظر ظهور إشعار «يعمل في الخلفية».
 
-## المتطلبات
+<h2><img src="docs/headings/h2-requirements-ar.svg" alt="المتطلبات" width="100%"></h2>
 
 - نظام **Windows** (اختُبر على Windows 11).
 - محرك **[Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)** مرفق مع البرنامج داخل مجلد `tesseract` مع حزمتي اللغة **`ara`** و**`eng`**، فلا تحتاج إلى تثبيته. عند تشغيل الكود المصدري يُستخدم `vendor/tesseract` إن وُجد، وإلا `C:\Program Files\Tesseract-OCR` أو `PATH`.
 - **اختياري:** [Ollama](https://ollama.com) مع نموذج مثل `gemma3:4b` (`ollama pull gemma3:4b`) للترجمة دون إنترنت.
 
-## التشغيل
+<h2><img src="docs/headings/h2-running-ar.svg" alt="التشغيل" width="100%"></h2>
 
-**الخيار الأول: البرنامج الجاهز** (لا يحتاج Python):
-نزّل `OCR-Tool-2.3.0-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (Tesseract مرفق معه، لا تحتاج تثبيت شيء.)
+<h3><img src="docs/headings/h3-prebuilt-ar.svg" alt="الخيار الأول: البرنامج الجاهز" width="100%"></h3>
 
-**الخيار الثاني: من الكود المصدري:**
+(لا يحتاج Python)
+نزّل `OCR-Tool-2.3.1-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (Tesseract مرفق معه، لا تحتاج تثبيت شيء.)
+
+<h3><img src="docs/headings/h3-source-ar.svg" alt="الخيار الثاني: من الكود المصدري" width="100%"></h3>
 
 ```bash
 py -3.14 -m pip install -r requirements.txt
 py -3.14 ocr_tool.py
 ```
 
-**بناء ملف EXE بنفسك:**
+<h3><img src="docs/headings/h3-build-ar.svg" alt="بناء ملف EXE بنفسك" width="100%"></h3>
 
 ```bash
 py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
@@ -325,7 +345,7 @@ py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
 py -3.14 tools/prepare_tesseract.py
 ```
 
-الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.3.0 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
+الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.3.1 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
 
 **تشغيل الاختبارات:**
 
@@ -340,7 +360,7 @@ py -3.14 -m pytest
 py -3.14 tools/make_assets.py
 ```
 
-## بنية المشروع
+<h2><img src="docs/headings/h2-layout-ar.svg" alt="بنية المشروع" width="100%"></h2>
 
 ```
 ocr_tool.py          البرنامج الرئيسي (الواجهة، التحديد، القراءة، الشريط)
@@ -351,11 +371,11 @@ tools/make_assets.py مولّد أيقونة التطبيق وملفات SVG
 assets/              الأيقونات (SVG/PNG/ICO) والخطوط
 docs/                اللافتة ولقطات الشاشة
 ocr_tool.spec        إعدادات بناء PyInstaller
-version_info.txt     بيانات إصدار ملف EXE (2.3.0)
+version_info.txt     بيانات إصدار ملف EXE (2.3.1)
 requirements.txt     مكتبات Python
 ```
 
-## استكشاف الأخطاء
+<h2><img src="docs/headings/h2-trouble-ar.svg" alt="استكشاف الأخطاء" width="100%"></h2>
 
 | المشكلة | الحل |
 |---|---|
@@ -367,12 +387,20 @@ requirements.txt     مكتبات Python
 | الترجمة لا تعمل | تحتاج اتصالاً بالإنترنت، أو Ollama يعمل وفيه نموذج (مثل `ollama pull gemma3:4b`). أول ترجمة محلية قد تستغرق نحو 15 ثانية لتحميل النموذج |
 | تظهر رسالة «حزمة اللغة ناقصة» | أعد فك ضغط البرنامج كاملًا؛ حزم اللغات مرفقة داخل `tesseract\tessdata` |
 
-## حدود معروفة
+<h2><img src="docs/headings/h2-limits-ar.svg" alt="حدود معروفة" width="100%"></h2>
 
 - يعمل على Windows فقط.
 - دقة العربية تتأثر بجودة الصورة ونوع الخط، وهي تعتمد على محرك Tesseract.
 - علامات الترقيم في الأسطر التي تخلط العربية بالإنجليزية قد تظهر في غير مكانها داخل مربعات النص (حدود Tkinter)، لكن النص المنسوخ صحيح.
 - الترجمة عبر Google ترسل النص إلى الإنترنت، ولا يحدث ذلك إلا عند ضغطك زر الترجمة.
+
+<h2><img src="docs/headings/h2-new-ar.svg" alt="ما الجديد" width="100%"></h2>
+
+## ما الجديد في الإصدار 2.3.1
+
+- **الصف السفلي:** صار «التشغيل مع Windows» تحت السجل، وفي الطرف المقابل تلميح «قراءة آخر منطقة» (`Ctrl+Shift+Z`).
+- **README:** شعار جديد وعناوين أقسام بأيقونات ولقطات للواجهة الحالية.
+- **الرسم والمعاينة:** رسم الأداء وصورة معاينة المستودع بالألوان الجديدة.
 
 ## ما الجديد في الإصدار 2.3.0
 
@@ -432,11 +460,11 @@ requirements.txt     مكتبات Python
 - تحسين القراءة: تصغير النص الكبير وإعادة المحاولة.
 - إصلاحات: عودة النافذة بعد فشل الالتقاط، منع فتح طبقتي تحديد، عدم تجمّد الواجهة أثناء القراءة، عدم نسخ رسائل الخطأ إلى الحافظة، وعمل `Esc` من أي برنامج.
 
-## الشكر والمصادر
+<h2><img src="docs/headings/h2-credits-ar.svg" alt="الشكر والمصادر" width="100%"></h2>
 
 [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) · [Pillow](https://python-pillow.org/) · [pytesseract](https://github.com/madmaze/pytesseract) · [keyboard](https://github.com/boppreh/keyboard) · [pystray](https://github.com/moses-palmer/pystray) · [PyInstaller](https://pyinstaller.org/) · خط [Tajawal](https://fonts.google.com/specimen/Tajawal) برخصة SIL Open Font License (`assets/fonts/OFL-Tajawal.txt`). تراخيص Tesseract وحزم اللغات المرفقة في `THIRD_PARTY_LICENSES.txt`.
 
-## الترخيص
+<h2><img src="docs/headings/h2-license-ar.svg" alt="الترخيص" width="100%"></h2>
 
 المطوّر والناشر: **Ali Alhumedi**. © 2026 Ali Alhumedi.
 

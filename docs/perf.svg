@@ -1,29 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 300" width="1000" height="300" role="img" aria-label="Reading time per capture: 1.07 s in 2.0.3, 0.63 s in 2.1.0">
   <title>Reading time per capture: 1.07 s in 2.0.3, 0.63 s in 2.1.0 (lower is better)</title>
-  <rect width="1000" height="300" rx="16" fill="#F3F6F8"/>
+  <rect width="1000" height="300" rx="16" fill="#F5F5F3"/>
   <g font-family="Segoe UI, Tajawal, Arial, sans-serif">
-    <text x="40" y="52" font-size="24" font-weight="700" fill="#12212B">Reading time per capture</text>
-    <text x="960" y="52" font-size="24" font-weight="700" fill="#12212B" text-anchor="end">زمن القراءة لكل التقاط</text>
-    <text x="40" y="80" font-size="15" fill="#5B6B76">Lower is better · الأقل أفضل</text>
+    <text x="40" y="52" font-size="24" font-weight="700" fill="#0A0A0A">Reading time per capture</text>
+    <text x="960" y="52" font-size="24" font-weight="700" fill="#0A0A0A" text-anchor="end">زمن القراءة لكل التقاط</text>
+    <text x="40" y="80" font-size="15" fill="#6B6B68">Lower is better · الأقل أفضل</text>
 
     <!-- axis: 0 at x=150, 1.2 s at x=870 (600 px per second) -->
-    <line x1="150" y1="104" x2="150" y2="232" stroke="#D5DEE4" stroke-width="1"/>
-    <line x1="450" y1="104" x2="450" y2="232" stroke="#E4EAEE" stroke-width="1"/>
-    <line x1="750" y1="104" x2="750" y2="232" stroke="#E4EAEE" stroke-width="1"/>
-    <text x="150" y="252" font-size="13" fill="#5B6B76" text-anchor="middle">0 s</text>
-    <text x="450" y="252" font-size="13" fill="#5B6B76" text-anchor="middle">0.5 s</text>
-    <text x="750" y="252" font-size="13" fill="#5B6B76" text-anchor="middle">1.0 s</text>
+    <line x1="150" y1="104" x2="150" y2="232" stroke="#E1E1DD" stroke-width="1"/>
+    <line x1="450" y1="104" x2="450" y2="232" stroke="#EDEDEA" stroke-width="1"/>
+    <line x1="750" y1="104" x2="750" y2="232" stroke="#EDEDEA" stroke-width="1"/>
+    <text x="150" y="252" font-size="13" fill="#6B6B68" text-anchor="middle">0 s</text>
+    <text x="450" y="252" font-size="13" fill="#6B6B68" text-anchor="middle">0.5 s</text>
+    <text x="750" y="252" font-size="13" fill="#6B6B68" text-anchor="middle">1.0 s</text>
 
     <!-- 2.0.3: 1.07 s = 642 px -->
-    <text x="134" y="146" font-size="18" font-weight="700" fill="#5B6B76" text-anchor="end">2.0.3</text>
-    <path d="M150 118 H788 a4 4 0 0 1 4 4 V156 a4 4 0 0 1 -4 4 H150 Z" fill="#9AABB6"/>
-    <text x="804" y="146" font-size="18" font-weight="700" fill="#12212B">1.07 s</text>
+    <text x="134" y="146" font-size="18" font-weight="700" fill="#6B6B68" text-anchor="end">2.0.3</text>
+    <path d="M150 118 H788 a4 4 0 0 1 4 4 V156 a4 4 0 0 1 -4 4 H150 Z" fill="#B5B5B1"/>
+    <text x="804" y="146" font-size="18" font-weight="700" fill="#0A0A0A">1.07 s</text>
 
     <!-- 2.1.0: 0.63 s = 378 px -->
-    <text x="134" y="200" font-size="18" font-weight="700" fill="#0E7C86" text-anchor="end">2.1.0</text>
-    <path d="M150 172 H524 a4 4 0 0 1 4 4 V210 a4 4 0 0 1 -4 4 H150 Z" fill="#0E7C86"/>
-    <text x="544" y="200" font-size="18" font-weight="700" fill="#12212B">0.63 s  (−41%)</text>
+    <text x="134" y="200" font-size="18" font-weight="700" fill="#E5352B" text-anchor="end">2.1.0</text>
+    <path d="M150 172 H524 a4 4 0 0 1 4 4 V210 a4 4 0 0 1 -4 4 H150 Z" fill="#E5352B"/>
+    <text x="544" y="200" font-size="18" font-weight="700" fill="#0A0A0A">0.63 s  (−41%)</text>
 
-    <text x="40" y="282" font-size="13" fill="#5B6B76">Average of 5 reads of a 4-line image (ara+eng, Tesseract 5) on the developer's PC · متوسط 5 قراءات لصورة من 4 أسطر</text>
+    <text x="40" y="282" font-size="13" fill="#6B6B68">Average of 5 reads of a 4-line image (ara+eng, Tesseract 5) on the developer's PC · متوسط 5 قراءات لصورة من 4 أسطر</text>
   </g>
 </svg>

@@ -20,7 +20,7 @@ import pystray
 import ui_icons
 import translator
 
-APP_VERSION = "2.3.0"  # يطابق version_info.txt
+APP_VERSION = "2.3.1"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
@@ -1145,7 +1145,7 @@ collapse_arrow(lang_frame, lang_content, "lang")
 # التشغيل مع Windows: يُسجَّل مسار EXE في مفتاح Run، ويعود المربع لحاله إن فشل التسجيل
 autostart_var = tk.BooleanVar(value=settings["autostart"])
 autostart_frame = reg(tk.Frame(main_frame), bg="bg")
-autostart_frame.pack(anchor=ANCHOR, pady=(0, px(8)))
+autostart_frame.pack(side='bottom', fill='x', pady=(px(8), 0))  # أسفل النافذة تحت السجل (يُرزم قبل السجل ليبقى الأخير)
 
 def toggle_autostart():
     on = autostart_var.get()
@@ -1168,6 +1168,10 @@ if not autostart_command():  # من الكود لا مسار EXE يُسجَّل�
     reg(autostart_box, disabledforeground="muted")  # نص المربع المعطَّل يتبع الثيم
     reg(tk.Label(autostart_frame, text=L("من نسخة EXE فقط", "Built app only"), font=(FONT, 10)),
         bg="bg", fg="muted").pack(side=SIDE, padx=px(6))
+# تلميح الاختصار الثابت في الطرف المقابل من السطر السفلي
+last_region_hint = reg(tk.Frame(autostart_frame), bg="bg")
+last_region_hint.pack(side=END_SIDE)
+add_hint(last_region_hint, L("قراءة آخر منطقة", "Read last region"), pretty_hotkey(LAST_REGION_HOTKEY))
 
 def secondary_button(parent, text, icon, command):
     """زر ثانوي بإطار رفيع (أخف من زر التحديد الرئيسي)، يُرتَّب من بداية السطر."""
