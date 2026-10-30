@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="OCR Tool 2.2.0" width="100%">
+<img src="docs/banner.svg" alt="OCR Tool 2.3.0" width="100%">
 
-![version](https://img.shields.io/badge/version-2.2.0-0E7C86)
+![version](https://img.shields.io/badge/version-2.3.0-0E7C86)
 ![platform](https://img.shields.io/badge/platform-Windows-0A4563)
 ![python](https://img.shields.io/badge/python-3.14-F5B544)
 ![ocr](https://img.shields.io/badge/OCR-Tesseract%205-149AA3)
@@ -90,7 +90,7 @@ flowchart LR
 ## Running
 
 **Option 1: the prebuilt app** (no Python needed):
-download `OCR-Tool-2.2.0-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (Tesseract is bundled, nothing to install.)
+download `OCR-Tool-2.3.0-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (Tesseract is bundled, nothing to install.)
 
 **Option 2: from source:**
 
@@ -111,7 +111,7 @@ The `vendor/tesseract` folder is tracked in the repository (~72MB), so no local 
 py -3.14 tools/prepare_tesseract.py
 ```
 
-Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.2.0 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
+Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.3.0 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
 
 **Run the tests:**
 
@@ -137,7 +137,7 @@ tools/make_assets.py app icon and SVG generator
 assets/              icons (SVG/PNG/ICO) and fonts
 docs/                banner and screenshots
 ocr_tool.spec        PyInstaller build settings
-version_info.txt     EXE version metadata (2.2.0)
+version_info.txt     EXE version metadata (2.3.0)
 requirements.txt     Python packages
 ```
 
@@ -159,6 +159,16 @@ requirements.txt     Python packages
 - Arabic accuracy depends on image quality and font, and on the Tesseract engine.
 - Punctuation in lines that mix Arabic and English may look misplaced inside the text boxes (a Tkinter limit), but the copied text is correct.
 - Google translation sends the text online, and only when you press Translate.
+
+## What's new in 2.3.0
+
+- **New look:** an ink-and-paper palette in light and dark themes, with one red signal for captured text and violet only for translations.
+- **New app icon:** a selection frame with the captured line in red.
+- **Result card:** a titled header with a status chip, and the Translate and Search buttons beside it.
+- **Reading language:** a segmented selector instead of radio dots.
+- **History:** a two-column table (time and text) with a tinted selected row; clicking the selected row copies it again.
+- **Selection screen:** a red frame with corner handles, a live size badge and a hint bar.
+- **Tray menu:** the actions first with their shortcuts, then Open window and Exit.
 
 ## What's new in 2.2.0
 
@@ -294,7 +304,7 @@ flowchart LR
 ## التشغيل
 
 **الخيار الأول: البرنامج الجاهز** (لا يحتاج Python):
-نزّل `OCR-Tool-2.2.0-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (Tesseract مرفق معه، لا تحتاج تثبيت شيء.)
+نزّل `OCR-Tool-2.3.0-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (Tesseract مرفق معه، لا تحتاج تثبيت شيء.)
 
 **الخيار الثاني: من الكود المصدري:**
 
@@ -315,7 +325,7 @@ py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
 py -3.14 tools/prepare_tesseract.py
 ```
 
-الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.2.0 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
+الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.3.0 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
 
 **تشغيل الاختبارات:**
 
@@ -341,7 +351,7 @@ tools/make_assets.py مولّد أيقونة التطبيق وملفات SVG
 assets/              الأيقونات (SVG/PNG/ICO) والخطوط
 docs/                اللافتة ولقطات الشاشة
 ocr_tool.spec        إعدادات بناء PyInstaller
-version_info.txt     بيانات إصدار ملف EXE (2.2.0)
+version_info.txt     بيانات إصدار ملف EXE (2.3.0)
 requirements.txt     مكتبات Python
 ```
 
@@ -363,6 +373,16 @@ requirements.txt     مكتبات Python
 - دقة العربية تتأثر بجودة الصورة ونوع الخط، وهي تعتمد على محرك Tesseract.
 - علامات الترقيم في الأسطر التي تخلط العربية بالإنجليزية قد تظهر في غير مكانها داخل مربعات النص (حدود Tkinter)، لكن النص المنسوخ صحيح.
 - الترجمة عبر Google ترسل النص إلى الإنترنت، ولا يحدث ذلك إلا عند ضغطك زر الترجمة.
+
+## ما الجديد في الإصدار 2.3.0
+
+- **شكل جديد:** لوحة ألوان بالأسود والورقي في الثيمين الفاتح والداكن، بإشارة حمراء واحدة للنص الملتقَط وبنفسجي للترجمة فقط.
+- **أيقونة جديدة للتطبيق:** إطار تحديد وسطر الالتقاط بالأحمر.
+- **بطاقة النتيجة:** رأس بعنوان وشارة حالة، وبجانبه زرّا الترجمة والبحث.
+- **لغة القراءة:** شريط اختيار مقسّم بدل الدوائر الصغيرة.
+- **السجل:** جدول بعمودين (الوقت والنص) وتظليل للصف المختار؛ والضغط على الصف المختار ينسخه من جديد.
+- **شاشة التحديد:** إطار أحمر بمقابض في الزوايا وشارة مقاس مباشرة وشريط تلميح.
+- **قائمة الإشعارات:** الإجراءات أولاً باختصاراتها، ثم فتح النافذة والخروج.
 
 ## ما الجديد في الإصدار 2.2.0
 

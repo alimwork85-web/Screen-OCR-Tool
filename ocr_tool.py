@@ -20,7 +20,7 @@ import pystray
 import ui_icons
 import translator
 
-APP_VERSION = "2.2.0"  # يطابق version_info.txt
+APP_VERSION = "2.3.0"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
@@ -56,18 +56,18 @@ if __name__ == "__main__":
 # ---- رموز التصميم (ألوان وخطوط): ثيم فاتح وثيم داكن يتبع إعداد Windows ----
 THEMES = {
     "light": {
-        "bg": "#F3F6F8", "surface": "#FFFFFF", "border": "#D5DEE4",
-        "ink": "#12212B", "muted": "#5B6B76",
-        "primary": "#0E7C86", "primary_hover": "#0B656E", "primary_press": "#094F57",
-        "accent": "#F2A93B", "select": "#CFE9EC",
-        "ok": "#167A4C", "warn": "#9A5800", "error": "#C0392B", "info": "#0E7C86",
+        "bg": "#F5F5F3", "surface": "#FFFFFF", "border": "#E1E1DD",
+        "ink": "#0A0A0A", "muted": "#6B6B68",
+        "primary": "#0A0A0A", "primary_hover": "#262626", "primary_press": "#3A3A3A", "on_primary": "#FFFFFF",
+        "accent": "#E5352B", "select": "#FDECEA", "vio": "#6B4FBB", "chip": "#EDEDEA",
+        "ok": "#1B7A4B", "warn": "#8A5A00", "error": "#C0392B", "info": "#0A0A0A",
     },
     "dark": {
-        "bg": "#11181D", "surface": "#1A242B", "border": "#2C3A44",
-        "ink": "#E6EDF1", "muted": "#9AABB6",
-        "primary": "#0E7C86", "primary_hover": "#0B656E", "primary_press": "#094F57",
-        "accent": "#F2A93B", "select": "#1F4A50",
-        "ok": "#4CC38A", "warn": "#E0A040", "error": "#F0776A", "info": "#4CC2CC",
+        "bg": "#0B0B0B", "surface": "#141414", "border": "#2A2A2A",
+        "ink": "#F5F5F5", "muted": "#9A9A9A",
+        "primary": "#F5F5F5", "primary_hover": "#E0E0E0", "primary_press": "#CCCCCC", "on_primary": "#0A0A0A",
+        "accent": "#E5352B", "select": "#2A1512", "vio": "#A58BFF", "chip": "#1E1E1E",
+        "ok": "#5FBF8A", "warn": "#E0A040", "error": "#F0776A", "info": "#F5F5F5",
     },
 }
 
@@ -129,7 +129,7 @@ class SnippingTool:
         self.on_cancel = on_cancel
         
         self.snip_surface = tk.Toplevel()
-        self.snip_surface.attributes('-alpha', 0.3)
+        self.snip_surface.attributes('-alpha', 0.5)
         # طبقة بلا إطار تغطي كل الشاشات (وليس الرئيسية فقط)
         self.origin_x, self.origin_y, width, height = get_virtual_screen()
         self.snip_surface.overrideredirect(True)
@@ -140,6 +140,25 @@ class SnippingTool:
 
         self.canvas = tk.Canvas(self.snip_surface, cursor="cross", bg="#333333", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
+
+        # شريط التلميح في أعلى الشاشة الرئيسية (وليس منتصف كل الشاشات)، ويختفي عند بدء السحب.
+        # الجملتان نصّان منفصلان: خلط العربية واللاتينية في سطر واحد يقلب ترتيب القراءة على لوحة الرسم
+        parts = [self.canvas.create_text(0, px(40), fill="white", font=(FONT, 14), text=t)
+                 for t in L(("اسحب لتحديد المنطقة", "للإلغاء Esc"), ("Drag to select the area", "Esc to cancel"))]
+        gap = px(28)
+        widths = [self.canvas.bbox(t)[2] - self.canvas.bbox(t)[0] for t in parts]
+        total = sum(widths) + gap * (len(parts) - 1)
+        x = -self.origin_x + root.winfo_screenwidth() // 2 + (total // 2 if not UI_EN else -total // 2)
+        for t, w in zip(parts, widths):
+            self.canvas.coords(t, x, px(40))
+            self.canvas.itemconfigure(t, anchor="e" if not UI_EN else "w")
+            x += (-(w + gap) if not UI_EN else (w + gap))
+        x1, y1, x2, y2 = self.canvas.bbox(*parts)
+        pill = self.canvas.create_rectangle(x1 - px(16), y1 - px(8), x2 + px(16), y2 + px(8), fill="#0A0A0A", outline="")
+        self.canvas.tag_raise("all")
+        self.canvas.tag_lower(pill)
+        self.canvas.tag_raise(parts[0]); self.canvas.tag_raise(parts[1])
+        self.hint_items = (pill, *parts)
 
         self.canvas.bind("<ButtonPress-1>", self.on_button_press)
         self.canvas.bind("<B1-Motion>", self.on_move_press)
@@ -180,11 +199,30 @@ class SnippingTool:
     def on_button_press(self, event):
         self.start_x = event.x
         self.start_y = event.y
-        self.rect = self.canvas.create_rectangle(self.start_x, self.start_y, 1, 1, outline='red', width=2)
+        self.canvas.delete(*self.hint_items)
+        self.rect = self.canvas.create_rectangle(self.start_x, self.start_y, 1, 1, outline=T["accent"], width=2)
+        self.handles = [self.canvas.create_rectangle(0, 0, 0, 0, fill="white", outline=T["accent"], width=2) for _ in range(4)]
+        self.badge_bg = self.canvas.create_rectangle(0, 0, 0, 0, fill="#0A0A0A", outline="")
+        self.badge = self.canvas.create_text(0, 0, fill="white", font=("Consolas", 11), anchor="w")
+        self.draw_selection(event.x, event.y)
+
+    def draw_selection(self, cur_x, cur_y):
+        """الإطار الأحمر وأربعة مقابض في زواياه وشارة بالمقاس (عرض × ارتفاع) فوقه."""
+        x1, x2 = sorted((self.start_x, cur_x))
+        y1, y2 = sorted((self.start_y, cur_y))
+        self.canvas.coords(self.rect, x1, y1, x2, y2)
+        r = px(4)
+        for h, (cx, cy) in zip(self.handles, ((x1, y1), (x2, y1), (x1, y2), (x2, y2))):
+            self.canvas.coords(h, cx - r, cy - r, cx + r, cy + r)
+        ty = y1 - px(16) if y1 > px(36) else y2 + px(16)
+        self.canvas.itemconfigure(self.badge, text=f"{x2 - x1} × {y2 - y1}")
+        self.canvas.coords(self.badge, x1 + px(8), ty)
+        bx1, by1, bx2, by2 = self.canvas.bbox(self.badge)
+        self.canvas.coords(self.badge_bg, bx1 - px(6), by1 - px(3), bx2 + px(6), by2 + px(3))
+        self.canvas.tag_raise(self.badge)
 
     def on_move_press(self, event):
-        cur_x, cur_y = (event.x, event.y)
-        self.canvas.coords(self.rect, self.start_x, self.start_y, cur_x, cur_y)
+        self.draw_selection(event.x, event.y)
 
     def on_button_release(self, event):
         if self.start_x is None:
@@ -557,11 +595,14 @@ def setup_tray():
     global tray_icon
     # دوال القائمة تُستدعى من خيط الشريط، فنحوّلها إلى خيط الواجهة
     to_ui = lambda fn: (lambda icon=None, item=None: root.after(0, fn))
+    # الإجراءات أولاً باختصاراتها (بعد \t يعرضها ويندوز في الطرف)، ثم النافذة والخروج
+    keyed = lambda text, combo: (lambda item: f"{text}\t{pretty_hotkey(combo())}")
     menu = pystray.Menu(
-        pystray.MenuItem(L("فتح النافذة", "Open window"), to_ui(show_window), default=True),
-        pystray.MenuItem(L("التقاط نص من الشاشة", "Capture text from screen"), to_ui(start_capture)),
+        pystray.MenuItem(keyed(L("التقاط نص من الشاشة", "Capture text from screen"), lambda: settings["hotkey"]), to_ui(start_capture)),
+        pystray.MenuItem(keyed(L("قراءة آخر منطقة", "Read last region"), lambda: LAST_REGION_HOTKEY), to_ui(capture_last_region)),
         pystray.MenuItem(L("قراءة صورة من الحافظة", "Read image from clipboard"), to_ui(ocr_from_clipboard)),
-        pystray.MenuItem(L("قراءة آخر منطقة", "Read last region"), to_ui(capture_last_region)),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem(L("فتح النافذة", "Open window"), to_ui(show_window), default=True),
         pystray.MenuItem(L("خروج", "Exit"), to_ui(quit_app)),
     )
     try:
@@ -728,12 +769,12 @@ def history_stamp(iso):
     return dt.strftime("%H:%M") if dt.date() == datetime.now().date() else dt.strftime("%Y-%m-%d %H:%M")
 
 def refresh_history_list():
-    history_list.delete(0, tk.END)
-    for stamp, item in history:
+    history_list.delete(*history_list.get_children())
+    for i, (stamp, item) in enumerate(history):
         preview = " ".join(item.split())
         if len(preview) > 70:
             preview = preview[:70] + "…"
-        history_list.insert(tk.END, f"{history_stamp(stamp)}  |  {preview}")
+        history_list.insert("", tk.END, iid=str(i), values=(history_stamp(stamp), preview))
 
 def add_to_history(text):
     if history and history[0][1] == text:
@@ -757,10 +798,10 @@ def clear_history():
     set_status(L("تم مسح السجل", "History cleared"), "ok")
 
 def on_history_select(event=None):
-    selection = history_list.curselection()
+    selection = history_list.selection()
     if not selection:
         return
-    text = history[selection[0]][1]
+    text = history[int(selection[0])][1]
     show_original(text)
     copy_to_clipboard(text)
     set_status(L("تم نسخ النص من السجل", "Text copied from the history"), "copied")
@@ -889,6 +930,8 @@ def apply_hotkey(combo):
         return
     settings["hotkey"] = combo
     save_settings()
+    if tray_icon:
+        tray_icon.update_menu()  # اختصار التقاط يظهر في القائمة
     register_last_region_hotkey()
     if hotkey_chip is not None:
         hotkey_chip.config(text=pretty_hotkey(combo))
@@ -943,6 +986,7 @@ def reg(widget, **opts):
 style = ttk.Style(root)
 style.theme_use("clam")
 SCROLLBAR_STYLE = "Theme.Vertical.TScrollbar"
+HISTORY_STYLE = "History.Treeview"
 
 def theme_scrollbar(box):
     """يستبدل شريط ScrolledText بشريط ttk يتبع ألوان الثيم، في مكانه نفسه (يمين المربع)."""
@@ -979,11 +1023,15 @@ def apply_theme(mode):
     style.configure(SCROLLBAR_STYLE, background=T["surface"], troughcolor=T["bg"], bordercolor=T["border"],
                     arrowcolor=T["muted"], lightcolor=T["surface"], darkcolor=T["surface"])
     style.map(SCROLLBAR_STYLE, background=[("active", T["select"])], arrowcolor=[("active", T["ink"])])
+    style.configure(HISTORY_STYLE, background=T["surface"], fieldbackground=T["surface"], foreground=T["ink"],
+                    borderwidth=0, bordercolor=T["surface"], lightcolor=T["surface"], darkcolor=T["surface"],
+                    rowheight=px(30), font=(FONT, 11))
+    style.map(HISTORY_STYLE, background=[("selected", T["select"])], foreground=[("selected", T["ink"])])
     for widget, opts in _themed:
         widget.configure(**{k: T[v] for k, v in opts.items()})
     for lbl, name, size, color_key in _icon_labels:
         lbl.configure(image=ui_icons.tk_icon(name, px(size), T[color_key]))
-    btn_capture.configure(image=ui_icons.tk_icon("capture", px(22), "#FFFFFF"))
+    btn_capture.configure(image=ui_icons.tk_icon("capture", px(22), T["on_primary"]))
     set_status(*current_status)
     set_titlebar_dark(mode == "dark")
 
@@ -1000,13 +1048,14 @@ def style_button(btn):
     """ألوان الحالات: عادي / مرور المؤشر / ضغط / تركيز لوحة المفاتيح."""
     btn.bind("<Enter>", lambda e: btn.config(bg=T["primary_hover"]))
     btn.bind("<Leave>", lambda e: btn.config(bg=T["primary"]))
-    reg(btn, bg="primary", activebackground="primary_press", highlightbackground="primary", highlightcolor="accent")
-    btn.config(activeforeground="white", highlightthickness=2, takefocus=True)
+    reg(btn, bg="primary", fg="on_primary", activebackground="primary_press", activeforeground="on_primary",
+        highlightbackground="primary", highlightcolor="accent")
+    btn.config(highlightthickness=2, takefocus=True)
 
 btn_capture = tk.Button(
     main_frame,
     text="  " + L("تحديد وقص الشاشة", "Select screen area"),
-    image=ui_icons.tk_icon("capture", px(22), "#FFFFFF"), compound=SIDE,
+    image=ui_icons.tk_icon("capture", px(22), T["on_primary"]), compound=SIDE,
     command=start_capture,
     fg='white',
     font=(FONT, 13, 'bold'), relief='flat', bd=0, pady=px(8), cursor="hand2"
@@ -1084,13 +1133,13 @@ lang_var = tk.StringVar(value=settings["lang"])
 lang_var.trace_add("write", lambda *_: (settings.update(lang=lang_var.get()), save_settings()))
 icon_label(lang_frame, "languages", 18, "muted", side=SIDE, padx=mirror((6, 0)))
 reg(tk.Label(lang_frame, text=L("لغة القراءة", "Reading language"), font=(FONT, 11, 'bold')), bg="bg", fg="ink").pack(side=SIDE)
-lang_content = reg(tk.Frame(lang_frame), bg="bg")
+lang_content = reg(tk.Frame(lang_frame, padx=3, pady=3), bg="chip")  # شريط اختيار: الخيار المحدد يبرز بلون السطح
 for label, value in zip(L(("عربي + إنجليزي", "عربي فقط", "إنجليزي فقط"),
                           ("Arabic + English", "Arabic only", "English only")), LANG_VALUES):
     reg(tk.Radiobutton(
         lang_content, text=label, value=value, variable=lang_var,
-        font=(FONT, 11), highlightthickness=0, cursor="hand2"
-    ), bg="bg", fg="ink", activebackground="bg", activeforeground="primary", selectcolor="surface").pack(side=SIDE, padx=6)
+        font=(FONT, 11), highlightthickness=0, cursor="hand2", indicatoron=False, bd=0, padx=px(12), pady=px(4)
+    ), bg="chip", fg="ink", activebackground="chip", activeforeground="ink", selectcolor="surface").pack(side=SIDE, padx=1)
 collapse_arrow(lang_frame, lang_content, "lang")
 
 # التشغيل مع Windows: يُسجَّل مسار EXE في مفتاح Run، ويعود المربع لحاله إن فشل التسجيل
@@ -1136,14 +1185,20 @@ def secondary_button(parent, text, icon, command):
 actions_frame = reg(tk.Frame(main_frame), bg="bg")
 actions_frame.pack(anchor=ANCHOR, pady=(0, px(10)))
 btn_clipboard = secondary_button(actions_frame, L("قراءة صورة من الحافظة", "Read image from clipboard"), "copy", ocr_from_clipboard)
-btn_translate = secondary_button(actions_frame, L("ترجمة", "Translate"), "globe", translate_all)
-btn_search = secondary_button(actions_frame, L("بحث", "Search"), "search", search_all)
+# رأس بطاقة النتيجة: العنوان والحالة من البداية، وأزرار الترجمة والبحث في الطرف المقابل
+result_head = reg(tk.Frame(main_frame), bg="bg")
+btn_translate = secondary_button(result_head, L("ترجمة", "Translate"), "globe", translate_all)
+btn_search = secondary_button(result_head, L("بحث", "Search"), "search", search_all)
+for _b in (btn_translate, btn_search):
+    _b.pack_configure(side=END_SIDE, padx=mirror((px(8), 0)))
 # اسم اللغة الأخرى بلغتها، ليجده من لا يقرأ لغة الواجهة الحالية
 btn_ui_lang = secondary_button(actions_frame, L("English", "العربية"), "language", switch_ui_language)
 
 current_status = (L("جاهز للاستخدام", "Ready"), "info")
-status_label = reg(tk.Label(main_frame, text=current_status[0], font=(FONT, 11), padx=2), bg="bg", fg="muted")
-status_label.pack(anchor=ANCHOR, pady=(0, 10))
+reg(tk.Label(result_head, text=L("النص المستخرج", "Extracted text"), font=(FONT, 12, 'bold')), bg="bg", fg="ink").pack(side=SIDE)
+status_label = reg(tk.Label(result_head, text=current_status[0], font=(FONT, 11), padx=px(8)), bg="chip", fg="muted")
+status_label.pack(side=SIDE, padx=px(10))
+result_head.pack(fill='x', pady=(0, px(6)))
 
 history_frame = reg(tk.Frame(main_frame), bg="bg")
 history_frame.pack(side='bottom', fill='x', pady=(12, 0))
@@ -1154,13 +1209,16 @@ reg(tk.Label(history_header, text=L("آخر النتائج (اضغط على نت
              font=(FONT, 10)), bg="bg", fg="muted").pack(side=SIDE, padx=mirror((0, 6)))
 btn_clear_history = secondary_button(history_header, L("مسح السجل", "Clear history"), "trash", clear_history)
 btn_clear_history.pack_configure(side=END_SIDE, padx=0)  # في الطرف المقابل لعنوان السجل
-history_list = reg(tk.Listbox(
-    history_frame, height=5, font=(FONT, 11), activestyle='none', exportselection=False,
-    relief='flat', bd=0, highlightthickness=1, selectforeground="white",
-    justify="right" if not UI_EN else "left"  # العربية من اليمين، والإنجليزية تبقى على اليسار
-), bg="surface", fg="ink", highlightbackground="border", highlightcolor="primary", selectbackground="primary")
+# جدول من عمودين (الوقت والنص): الوقت من بداية السطر، والعربية من اليمين والإنجليزية من اليسار
+history_box = reg(tk.Frame(history_frame, highlightthickness=1), bg="surface", highlightbackground="border")
+history_box.pack(fill='x')
+history_list = ttk.Treeview(history_box, columns=("t", "x"), show="", height=5, selectmode="browse", style=HISTORY_STYLE,
+                            displaycolumns=("t", "x") if UI_EN else ("x", "t"))
+history_list.column("t", width=px(120), stretch=False, anchor="w" if UI_EN else "e")
+history_list.column("x", anchor="w" if UI_EN else "e")
 history_list.pack(fill='x')
-history_list.bind("<<ListboxSelect>>", on_history_select)
+history_list.bind("<<TreeviewSelect>>", on_history_select)  # التحديد بلوحة المفاتيح
+history_list.bind("<ButtonRelease-1>", on_history_select)  # الضغط على نتيجة محددة مسبقاً لا يغيّر التحديد فلا يطلق الحدث الأول
 history[:] = load_history()  # السجل المحفوظ من التشغيلات السابقة
 refresh_history_list()
 
@@ -1176,12 +1234,12 @@ theme_scrollbar(original_text_area)
 # مربع الترجمة: للقراءة فقط، ويظهر بعد النص الأصلي (يساره في العربية) بنصف العرض بعد أول ترجمة (show_translation)
 translation_frame = reg(tk.Frame(main_frame), bg="bg")
 translation_frame.pack_propagate(False)  # عرضه يُضبط بنصف المساحة، لا بحجم محتواه
-translation_label = reg(tk.Label(translation_frame, text=L("الترجمة", "Translation"), font=(FONT, 10)), bg="bg", fg="muted")
+translation_label = reg(tk.Label(translation_frame, text=L("الترجمة", "Translation"), font=(FONT, 10)), bg="bg", fg="vio")
 translation_label.pack(anchor=ANCHOR, pady=(0, px(4)))
 translation_area = reg(scrolledtext.ScrolledText(
     translation_frame, wrap=tk.WORD, font=(FONT, 13), width=1, height=1, relief='flat', bd=0,
     padx=px(14), pady=px(12), highlightthickness=1, state="disabled"
-), bg="surface", fg="ink", highlightbackground="border", highlightcolor="primary",
+), bg="surface", fg="ink", highlightbackground="border", highlightcolor="vio",
    selectbackground="select", selectforeground="ink", insertbackground="ink")
 translation_area.tag_configure("rtl", justify="right")
 translation_area.pack(fill='both', expand=True)

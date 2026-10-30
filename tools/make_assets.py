@@ -12,8 +12,7 @@ sys.path.insert(0, ROOT)
 import ui_icons  # noqa: E402
 
 ASSETS = os.path.join(ROOT, "assets")
-TEAL_A, TEAL_B = (0x14, 0x9A, 0xA3), (0x0A, 0x45, 0x63)
-WHITE, AMBER = (255, 255, 255), (0xF5, 0xB5, 0x44)
+INK, PAPER, RED, WHITE = (0x0F, 0x0F, 0x0F), (0xF5, 0xF5, 0xF2), (0xE5, 0x35, 0x2B), (255, 255, 255)  # حبر وورق وأحمر التحديد
 M = 1024  # مساحة الرسم الرئيسية
 
 # الهندسة بوحدات 1024: أقواس تصوير في الزوايا وثلاثة أسطر نص تبدأ من اليمين (اتجاه العربية)
@@ -23,17 +22,15 @@ BRACKETS = [
     [(774, 624), (774, 774), (624, 774)],
     [(400, 774), (250, 774), (250, 624)],
 ]
-LINES = [(648, 420, 264, AMBER), (648, 512, 200, WHITE), (648, 604, 130, WHITE)]  # (يمين، y، الطول، اللون)
-STROKE_BRACKET, STROKE_LINE = 64, 58
+HILITE = (330, 358, 694, 470, 26)  # شريط النص المحدد بالأحمر (يسار، أعلى، يمين، أسفل، نصف القطر)
+LINES = [(634, 414, 234, WHITE), (634, 552, 178, PAPER), (634, 640, 114, PAPER)]  # (يمين، y، الطول، اللون)
+STROKE_BRACKET, STROKE_LINE = 64, 44
 
 
 def draw_master(bold=False):
-    ramp = Image.linear_gradient("L").resize((M, M))
-    diag = ImageChops.add(ramp, ramp.rotate(90).transpose(Image.FLIP_LEFT_RIGHT), scale=2)
-    bg = Image.composite(Image.new("RGB", (M, M), TEAL_B), Image.new("RGB", (M, M), TEAL_A), diag)
     mask = Image.new("L", (M, M), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, M - 1, M - 1), radius=230, fill=255)
-    img = bg.convert("RGBA")
+    img = Image.new("RGBA", (M, M), INK + (255,))
     img.putalpha(mask)
     d = ImageDraw.Draw(img)
 
@@ -44,8 +41,10 @@ def draw_master(bold=False):
 
     extra = 28 if bold else 0  # نسخة أثخن للأحجام الصغيرة حتى تبقى الخطوط ظاهرة
     for pts in BRACKETS:
-        stroke(pts, STROKE_BRACKET + extra, WHITE)
-    for right, y, length, color in LINES:
+        stroke(pts, STROKE_BRACKET + extra, PAPER)
+    l, t, r, b, rad = HILITE
+    d.rounded_rectangle((l, t - extra // 2, r, b + extra // 2), radius=rad, fill=RED)
+    for right, y, length, color in LINES[:1 if bold else 3]:
         stroke([(right - length, y), (right, y)], STROKE_LINE + extra, color)
     return img
 
@@ -58,18 +57,14 @@ def app_icon_svg():
         f'<line x1="{r - l}" y1="{y}" x2="{r}" y2="{y}" stroke="#{c[0]:02X}{c[1]:02X}{c[2]:02X}" stroke-width="{STROKE_LINE}"/>'
         for r, y, l, c in LINES
     )
+    l, t, r, b, rad = HILITE
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {M} {M}" width="{M}" height="{M}">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#149AA3"/>
-      <stop offset="1" stop-color="#0A4563"/>
-    </linearGradient>
-  </defs>
-  <rect width="{M}" height="{M}" rx="230" fill="url(#bg)"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="{STROKE_BRACKET}" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="{M}" height="{M}" rx="230" fill="#0F0F0F"/>
+  <g fill="none" stroke="#F5F5F2" stroke-width="{STROKE_BRACKET}" stroke-linecap="round" stroke-linejoin="round">
     {brackets}
   </g>
-  <g stroke-linecap="round">
+  <rect x="{l}" y="{t}" width="{r - l}" height="{b - t}" rx="{rad}" fill="#E5352B"/>
+  <g stroke-linecap="round" stroke-width="{STROKE_LINE}">
     {lines}
   </g>
 </svg>
