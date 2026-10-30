@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="OCR Tool 2.3.1" width="100%">
+<img src="docs/banner.svg" alt="OCR Tool 2.3.2" width="100%">
 
-![version](https://img.shields.io/badge/version-2.3.1-E5352B)
+![version](https://img.shields.io/badge/version-2.3.2-E5352B)
 ![platform](https://img.shields.io/badge/platform-Windows-0F0F0F)
 ![python](https://img.shields.io/badge/python-3.14-3776AB)
 ![ocr](https://img.shields.io/badge/OCR-Tesseract%205-0F0F0F)
@@ -96,7 +96,7 @@ flowchart LR
 <h3><img src="docs/headings/h3-prebuilt-en.svg" alt="Option 1: the prebuilt app" width="100%"></h3>
 
 (no Python needed)
-download `OCR-Tool-2.3.1-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (Tesseract is bundled, nothing to install.)
+download `OCR-Tool-2.3.2-windows.zip` from the [releases page](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest), extract it to any folder, and run `ocr_tool.exe` inside it. (Tesseract is bundled, nothing to install.)
 
 <h3><img src="docs/headings/h3-source-en.svg" alt="Option 2: from source" width="100%"></h3>
 
@@ -117,7 +117,7 @@ The `vendor/tesseract` folder is tracked in the repository (~72MB), so no local 
 py -3.14 tools/prepare_tesseract.py
 ```
 
-Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.3.1 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
+Output: the `dist/ocr_tool/` folder containing `ocr_tool.exe` (carries version 2.3.2 and the app icon, with fonts and icons bundled). It is built as a folder rather than a single file so it does not unpack into Temp on every launch and leave leftovers behind; move the whole folder, not just the EXE.
 
 **Run the tests:**
 
@@ -143,7 +143,7 @@ tools/make_assets.py app icon and SVG generator
 assets/              icons (SVG/PNG/ICO) and fonts
 docs/                banner and screenshots
 ocr_tool.spec        PyInstaller build settings
-version_info.txt     EXE version metadata (2.3.1)
+version_info.txt     EXE version metadata (2.3.2)
 requirements.txt     Python packages
 ```
 
@@ -167,6 +167,10 @@ requirements.txt     Python packages
 - Google translation sends the text online, and only when you press Translate.
 
 <h2><img src="docs/headings/h2-new-en.svg" alt="What's new" width="100%"></h2>
+
+## What's new in 2.3.2
+
+- **Tray menu icons:** every item in the notification-area menu now has an icon (capture, last region, clipboard, window, exit), next to its shortcut.
 
 ## What's new in 2.3.1
 
@@ -324,7 +328,7 @@ flowchart LR
 <h3><img src="docs/headings/h3-prebuilt-ar.svg" alt="الخيار الأول: البرنامج الجاهز" width="100%"></h3>
 
 (لا يحتاج Python)
-نزّل `OCR-Tool-2.3.1-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (Tesseract مرفق معه، لا تحتاج تثبيت شيء.)
+نزّل `OCR-Tool-2.3.2-windows.zip` من [صفحة الإصدارات](https://github.com/alimwork85-web/Screen-OCR-Tool/releases/latest)، وفك ضغطه في أي مجلد، ثم شغّل `ocr_tool.exe` من داخله. (Tesseract مرفق معه، لا تحتاج تثبيت شيء.)
 
 <h3><img src="docs/headings/h3-source-ar.svg" alt="الخيار الثاني: من الكود المصدري" width="100%"></h3>
 
@@ -345,7 +349,7 @@ py -3.14 -m PyInstaller --noconfirm ocr_tool.spec
 py -3.14 tools/prepare_tesseract.py
 ```
 
-الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.3.1 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
+الناتج: مجلد `dist/ocr_tool/` وفيه `ocr_tool.exe` (يحمل رقم الإصدار 2.3.2 وأيقونة التطبيق، ويضم الخط والأيقونات). يُبنى البرنامج مجلدًا لا ملفًا واحدًا حتى لا يُفك في مجلد Temp عند كل تشغيل فتتراكم بقاياه؛ انقل المجلد كاملًا لا ملف EXE وحده.
 
 **تشغيل الاختبارات:**
 
@@ -371,7 +375,7 @@ tools/make_assets.py مولّد أيقونة التطبيق وملفات SVG
 assets/              الأيقونات (SVG/PNG/ICO) والخطوط
 docs/                اللافتة ولقطات الشاشة
 ocr_tool.spec        إعدادات بناء PyInstaller
-version_info.txt     بيانات إصدار ملف EXE (2.3.1)
+version_info.txt     بيانات إصدار ملف EXE (2.3.2)
 requirements.txt     مكتبات Python
 ```
 
@@ -395,6 +399,10 @@ requirements.txt     مكتبات Python
 - الترجمة عبر Google ترسل النص إلى الإنترنت، ولا يحدث ذلك إلا عند ضغطك زر الترجمة.
 
 <h2><img src="docs/headings/h2-new-ar.svg" alt="ما الجديد" width="100%"></h2>
+
+## ما الجديد في الإصدار 2.3.2
+
+- **أيقونات قائمة الإشعارات:** لكل عنصر في قائمة منطقة الإشعارات أيقونة (التقاط، آخر منطقة، الحافظة، النافذة، خروج) بجانب اختصاره.
 
 ## ما الجديد في الإصدار 2.3.1
 

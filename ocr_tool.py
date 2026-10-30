@@ -20,7 +20,7 @@ import pystray
 import ui_icons
 import translator
 
-APP_VERSION = "2.3.1"  # يطابق version_info.txt
+APP_VERSION = "2.3.2"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
@@ -590,6 +590,50 @@ def quit_app():
         tray_icon.stop()
     root.destroy()
 
+# أيقونتان للقائمة ليستا في ui_icons (نضيفهما هنا بدل تعديل الملف): نافذة، وخروج
+ui_icons.ICONS.setdefault("window", [("rect", 3, 5, 18, 14, 2.5), ("line", 3, 9.5, 21, 9.5)])
+ui_icons.ICONS.setdefault("exit", [("poly", [(10, 4), (6, 4), (4, 6), (4, 18), (6, 20), (10, 20)]),
+                                   ("poly", [(15, 8), (19, 12), (15, 16)]), ("line", 19, 12, 9, 12)])
+
+def menu_bitmap(name):
+    """HBITMAP من 32 بت بشفافية مسبقة الضرب لأيقونة عنصر في قائمة الشريط (قوائم ويندوز لا تقبل غيرها)."""
+    size = px(16)
+    img = ui_icons.render(name, size, T["ink"])
+    r, g, b, a = img.convert("RGBa").split()
+    data = Image.merge("RGBA", (b, g, r, a)).tobytes()
+    class BMIH(ctypes.Structure):
+        _fields_ = [("biSize", ctypes.c_uint32), ("biWidth", ctypes.c_int32), ("biHeight", ctypes.c_int32),
+                    ("biPlanes", ctypes.c_uint16), ("biBitCount", ctypes.c_uint16), ("biCompression", ctypes.c_uint32),
+                    ("biSizeImage", ctypes.c_uint32), ("biXPels", ctypes.c_int32), ("biYPels", ctypes.c_int32),
+                    ("biClrUsed", ctypes.c_uint32), ("biClrImportant", ctypes.c_uint32)]
+    gdi32 = ctypes.windll.gdi32
+    gdi32.CreateDIBSection.restype = ctypes.c_void_p
+    gdi32.CreateDIBSection.argtypes = [ctypes.c_void_p, ctypes.POINTER(BMIH), ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p),
+                                       ctypes.c_void_p, ctypes.c_uint32]
+    bits = ctypes.c_void_p()
+    hbm = gdi32.CreateDIBSection(None, ctypes.byref(BMIH(40, size, -size, 1, 32, 0, 0, 0, 0, 0, 0)), 0, ctypes.byref(bits), None, 0)
+    ctypes.memmove(bits, data, len(data))
+    return hbm
+
+def add_menu_icons(pairs):
+    """يضيف أيقونة لكل (عنصر قائمة، اسم أيقونة) عبر MIIM_BITMAP؛ pystray لا يدعمها، فنعدّل إنشاء العنصر.
+    إن فشل شيء تبقى القائمة تعمل بلا أيقونات."""
+    try:
+        from pystray import _win32 as ps
+        from pystray._util import win32 as w32
+        bitmaps = {id(item): menu_bitmap(name) for item, name in pairs}
+        original = ps.Icon._create_menu_item
+        def with_bitmap(self, descriptor, callbacks):
+            info = original(self, descriptor, callbacks)
+            hbm = bitmaps.get(id(descriptor))
+            if hbm:
+                info.fMask |= w32.MIIM_BITMAP
+                info.hbmpItem = hbm
+            return info
+        ps.Icon._create_menu_item = with_bitmap
+    except Exception:
+        pass
+
 def setup_tray():
     """يشغّل أيقونة الشريط؛ إن فشل يبقى الإغلاق العادي (X) ينهي البرنامج."""
     global tray_icon
@@ -597,14 +641,15 @@ def setup_tray():
     to_ui = lambda fn: (lambda icon=None, item=None: root.after(0, fn))
     # الإجراءات أولاً باختصاراتها (بعد \t يعرضها ويندوز في الطرف)، ثم النافذة والخروج
     keyed = lambda text, combo: (lambda item: f"{text}\t{pretty_hotkey(combo())}")
-    menu = pystray.Menu(
+    items = [
         pystray.MenuItem(keyed(L("التقاط نص من الشاشة", "Capture text from screen"), lambda: settings["hotkey"]), to_ui(start_capture)),
         pystray.MenuItem(keyed(L("قراءة آخر منطقة", "Read last region"), lambda: LAST_REGION_HOTKEY), to_ui(capture_last_region)),
         pystray.MenuItem(L("قراءة صورة من الحافظة", "Read image from clipboard"), to_ui(ocr_from_clipboard)),
-        pystray.Menu.SEPARATOR,
         pystray.MenuItem(L("فتح النافذة", "Open window"), to_ui(show_window), default=True),
         pystray.MenuItem(L("خروج", "Exit"), to_ui(quit_app)),
-    )
+    ]
+    add_menu_icons(zip(items, ("capture", "clock", "copy", "window", "exit")))
+    menu = pystray.Menu(*items[:3], pystray.Menu.SEPARATOR, *items[3:])
     try:
         tray_icon = pystray.Icon("ocr_tool", make_tray_image(), L(f"أداة OCR {APP_VERSION}", f"OCR Tool {APP_VERSION}"), menu)
         tray_icon.run_detached()
