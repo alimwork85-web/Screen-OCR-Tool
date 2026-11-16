@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 import tkinter as tk
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import font as tkfont, messagebox, scrolledtext, ttk
 import ctypes
 import time
 from datetime import datetime
@@ -15,12 +15,12 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 import keyboard
 import pytesseract
-from PIL import Image, ImageGrab, ImageOps, ImageStat
+from PIL import Image, ImageDraw, ImageGrab, ImageOps, ImageStat, ImageTk
 import pystray
 import ui_icons
 import translator
 
-APP_VERSION = "2.3.2"  # يطابق version_info.txt
+APP_VERSION = "2.4.0"  # يطابق version_info.txt
 
 # يجب أن يسبق إنشاء أي نافذة Tk، حتى تتطابق إحداثيات الواجهة مع إحداثيات الالتقاط
 try:
@@ -124,6 +124,8 @@ def get_virtual_screen():
             user32.GetSystemMetrics(78), user32.GetSystemMetrics(79))
 
 class SnippingTool:
+    HOLE = "#010203"  # لون لا يُستخدم في أي عنصر آخر على الطبقة
+
     def __init__(self, on_crop_complete, on_cancel):
         self.on_crop_complete = on_crop_complete
         self.on_cancel = on_cancel
@@ -138,7 +140,9 @@ class SnippingTool:
         self.snip_surface.attributes('-topmost', True)
         self.snip_surface.config(cursor="cross")
 
-        self.canvas = tk.Canvas(self.snip_surface, cursor="cross", bg="#333333", highlightthickness=0)
+        # لون المفتاح: ما يُرسم به يصير شفافاً تماماً، فتظهر المنطقة المحددة صافية وسط الطبقة المعتمة
+        self.snip_surface.attributes('-transparentcolor', self.HOLE)
+        self.canvas = tk.Canvas(self.snip_surface, cursor="cross", bg="#000000", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
         # شريط التلميح في أعلى الشاشة الرئيسية (وليس منتصف كل الشاشات)، ويختفي عند بدء السحب.
@@ -200,7 +204,7 @@ class SnippingTool:
         self.start_x = event.x
         self.start_y = event.y
         self.canvas.delete(*self.hint_items)
-        self.rect = self.canvas.create_rectangle(self.start_x, self.start_y, 1, 1, outline=T["accent"], width=2)
+        self.rect = self.canvas.create_rectangle(self.start_x, self.start_y, 1, 1, outline=T["accent"], width=2, fill=self.HOLE)
         self.handles = [self.canvas.create_rectangle(0, 0, 0, 0, fill="white", outline=T["accent"], width=2) for _ in range(4)]
         self.badge_bg = self.canvas.create_rectangle(0, 0, 0, 0, fill="#0A0A0A", outline="")
         self.badge = self.canvas.create_text(0, 0, fill="white", font=("Consolas", 11), anchor="w")
@@ -529,7 +533,7 @@ def show_translation(out, source, tl):
         set_status(source, "error")  # source هنا سبب الفشل
         return
     if not translation_frame.winfo_manager():  # يظهر المربع بعد أول ترجمة فقط
-        translation_frame.pack(side=END_SIDE, fill='y', before=original_text_area,
+        translation_frame.pack(side=END_SIDE, fill='y', before=text_card,
                                padx=(px(12), 0) if UI_EN else (0, px(12)))
     translation_label.config(text=L(f"الترجمة ({source})", f"Translation ({source})"))
     translation_area.config(state="normal")
@@ -737,9 +741,16 @@ UI_EN = settings["ui"] == "en"
 SIDE, END_SIDE, ANCHOR = ('left', 'right', 'w') if UI_EN else ('right', 'left', 'e')
 translator.UI_EN = UI_EN
 
+def rtl(text):
+    """يحيط النص بعلامتي RLE/PDF غير المرئيتين: Tk يرتّب السطر من اليسار افتراضياً، فتنقلب مواضع
+    الكلمات اللاتينية والأقواس في الجملة العربية («التشغيل مع Windows»). RLM وحدها لا تكفي (جُرّبت)."""
+    return "‫" + text + "‬"
+
 def L(ar, en):
     """النص بلغة الواجهة."""
-    return en if UI_EN else ar
+    if UI_EN:
+        return en
+    return rtl(ar) if isinstance(ar, str) else ar
 
 def mirror(pad):
     """هامش (يسار، يمين) مكتوب للعربية؛ يُعكس في الإنجليزية."""
@@ -819,6 +830,8 @@ def refresh_history_list():
         preview = " ".join(item.split())
         if len(preview) > 70:
             preview = preview[:70] + "…"
+        if rtl_tags(item):  # للعرض فقط: النص المحفوظ والمنسوخ يبقى بلا علامات
+            preview = rtl(preview)
         history_list.insert("", tk.END, iid=str(i), values=(history_stamp(stamp), preview))
 
 def add_to_history(text):
@@ -1049,6 +1062,179 @@ def icon_label(parent, name, size, color_key, **pack_opts):
     lbl.pack(**pack_opts)
     return lbl
 
+def round_rect(w, h, r, fill, outline=None, line=1):
+    """صورة مستطيل بزوايا مستديرة منعّمة (يُرسم مكبّراً ثم يُصغَّر)، وما خارج الزوايا شفاف."""
+    s = 4
+    img = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+    ImageDraw.Draw(img).rounded_rectangle((0, 0, w * s - 1, h * s - 1), radius=r * s, fill=fill,
+                                          outline=outline, width=line * s if outline else 0)
+    return img.resize((w, h), Image.LANCZOS)
+
+_check_images = {}
+
+def check_image(on):
+    """مربع الاختيار بألوان الثيم: فارغ بإطار، أو ممتلئ بعلامة صح."""
+    key = (on, T["primary"], T["surface"])
+    if key not in _check_images:
+        size = px(18)
+        img = round_rect(size, size, px(4), T["primary"] if on else T["surface"], None if on else T["muted"], max(1, px(1)))
+        if on:
+            img.alpha_composite(ui_icons.render("check", size, T["on_primary"]))
+        _check_images[key] = ImageTk.PhotoImage(img)
+    return _check_images[key]
+
+# ---- الزوايا المستديرة: عناصر Tk لا تدعمها، فتُرسم على لوحة (Canvas) ----
+RADIUS = 8
+_round_widgets = []   # كل ما يُعاد رسمه عند تبديل الثيم
+_corner_images = {}
+
+def paint_round(canvas, w, h, fill, outline=None, line=1):
+    """يرسم خلفية مستديرة الزوايا بحجم اللوحة: الزوايا الأربع صور صغيرة منعّمة والباقي مستطيلات،
+    لأن صورة واحدة بحجم البطاقة يُعاد إنشاؤها مع كل تغيير حجم ثقيلة."""
+    r = min(px(RADIUS), w // 2, h // 2)
+    canvas.delete("shape")
+    if r < 1 or (fill == canvas["bg"] and not outline):  # لا شيء يُرى: أصغر من أن يُرسم، أو بلون ما خلفه
+        return
+    key = (r, fill, outline, line)
+    if key not in _corner_images:
+        img = round_rect(2 * r, 2 * r, r, fill, outline, line)
+        _corner_images[key] = [ImageTk.PhotoImage(img.crop(box)) for box in
+                               ((0, 0, r, r), (r, 0, 2 * r, r), (0, r, r, 2 * r), (r, r, 2 * r, 2 * r))]
+    canvas.create_rectangle(r, 0, w - r, h, fill=fill, outline="", tags="shape")
+    canvas.create_rectangle(0, r, w, h - r, fill=fill, outline="", tags="shape")
+    if outline:
+        for box in ((r, 0, w - r, line), (r, h - line, w - r, h), (0, r, line, h - r), (w - line, r, w, h - r)):
+            canvas.create_rectangle(*box, fill=outline, outline="", tags="shape")
+    for img, (x, y, anchor) in zip(_corner_images[key], ((0, 0, "nw"), (w, 0, "ne"), (0, h, "sw"), (w, h, "se"))):
+        canvas.create_image(x, y, image=img, anchor=anchor, tags="shape")
+    canvas.tag_lower("shape")
+
+class RoundButton(tk.Canvas):
+    """زر أو شريحة بزوايا مستديرة. يقبل من خيارات tk.Button ما يستخدمه البرنامج:
+    config(state=...) و config(text=...) و config(fg=..., image=...).
+
+    kind: "primary" (زر التحديد)، "secondary" (بإطار رفيع)، "chip" (شريحة بلا إطار)، "key" (شريحة اختصار بإطار).
+    command=None يجعله عنصر عرض لا يُضغط. selected: دالة تجعله خياراً في شريط اختيار (المحدد بلون السطح).
+    back: رمز لون ما خلفه، لتندمج الزوايا مع الخلفية."""
+
+    def __init__(self, parent, text, command=None, font=None, icon=None, icon_size=16, kind="secondary",
+                 padx=10, pady=3, back="bg", selected=None):
+        super().__init__(parent, highlightthickness=0, bd=0, cursor="hand2" if command else "",
+                         takefocus=bool(command))
+        self.text, self.command, self.icon, self.icon_size, self.kind = text, command, icon, icon_size, kind
+        self.font = tkfont.Font(font=font or (FONT, 11))
+        self.pad, self.back, self.selected = (px(padx), px(pady)), back, selected
+        self.state, self.fg, self.image = "normal", None, None
+        self.hover = self.pressed = self.focused = False
+        if command:
+            self.bind("<Enter>", lambda e: self.set_flags(hover=True))
+            self.bind("<Leave>", lambda e: self.set_flags(hover=False, pressed=False))
+            self.bind("<ButtonPress-1>", lambda e: self.set_flags(pressed=True))
+            self.bind("<ButtonRelease-1>", self.on_release)
+            self.bind("<FocusIn>", lambda e: self.set_flags(focused=True))
+            self.bind("<FocusOut>", lambda e: self.set_flags(focused=False))
+            self.bind("<Return>", lambda e: self.invoke())
+            self.bind("<space>", lambda e: self.invoke())
+        self.bind("<Configure>", lambda e: self.redraw(e.width, e.height))
+        self.bind("<Destroy>", lambda e: _round_widgets.remove(self))
+        _round_widgets.append(self)
+        self.fit()
+
+    def configure(self, cnf=None, **kw):
+        kw = dict(cnf or {}, **kw)
+        own = {k: kw.pop(k) for k in ("state", "text", "fg", "image") if k in kw}
+        kw.pop("compound", None)  # الأيقونة دائماً في بداية النص
+        if kw:
+            super().configure(**kw)
+        if own:
+            self.__dict__.update(own)
+            self.fit()
+    config = configure
+
+    def set_flags(self, **flags):
+        self.__dict__.update(flags)
+        self.redraw()
+
+    def on_release(self, event):
+        inside = self.pressed and 0 <= event.x < self.winfo_width() and 0 <= event.y < self.winfo_height()
+        self.set_flags(pressed=False)
+        if inside:
+            self.invoke()
+
+    def invoke(self):
+        if self.state == "normal" and self.command:
+            self.command()
+
+    def icon_width(self):
+        return px(self.icon_size) + px(8) if (self.icon or self.image) else 0
+
+    def fit(self):
+        """يضبط الحجم المطلوب على قدر النص والأيقونة ثم يرسم."""
+        w = self.font.measure(self.text) + self.icon_width() + 2 * self.pad[0]
+        h = max(self.font.metrics("linespace"), px(self.icon_size) if self.icon_width() else 0) + 2 * self.pad[1]
+        super().configure(width=w, height=h)
+        self.redraw(max(w, self.winfo_width()), h)
+
+    def redraw(self, w=None, h=None):
+        w, h = w or self.winfo_width(), h or self.winfo_height()
+        if w <= 1:  # لم تظهر النافذة بعد
+            w, h = self.winfo_reqwidth(), self.winfo_reqheight()
+        active =self.state == "normal" and self.command
+        outline, line = None, max(1, px(1))
+        if self.kind == "primary":
+            fill = T["primary_press" if self.pressed else "primary_hover" if self.hover and active else "primary"]
+            ink = T["on_primary"]
+            if self.focused:
+                outline, line = T["accent"], px(2)
+        elif self.selected:
+            fill, ink = T["surface" if self.selected() else self.back], T["ink"]
+        elif self.kind == "chip":
+            fill, ink = T["chip"], T["muted"]
+        else:
+            fill = T["select" if (self.hover or self.pressed) and active else "surface"]
+            ink = T["ink" if self.state == "normal" else "muted"]
+            outline = T["primary" if self.focused else "border"]
+        ink = self.fg or ink
+        super().configure(bg=T[self.back])
+        paint_round(self, w, h, fill, outline, line)
+        self.delete("content")
+        # المجموعة (أيقونة ثم نص) في الوسط؛ الأيقونة في بداية السطر حسب اتجاه اللغة
+        text_w, icon_w = self.font.measure(self.text), self.icon_width()
+        start = (w - text_w - icon_w) // 2
+        if icon_w:
+            image = self.image or ui_icons.tk_icon(self.icon, px(self.icon_size), ink)
+            x = start if UI_EN else start + text_w + px(8)
+            self.create_image(x, h // 2, image=image, anchor="w", tags="content")
+        self.create_text(start + (icon_w if UI_EN else 0), h // 2, text=self.text, font=self.font, fill=ink,
+                         anchor="w", tags="content")
+
+class RoundCard(tk.Canvas):
+    """إطار بزوايا مستديرة حول محتواه (مربع نص أو جدول). المحتوى يُرزم داخله بهامش INSET يُبقي الزوايا ظاهرة."""
+    INSET = 4
+
+    def __init__(self, parent, fill="surface", border="border", focus="primary", back="bg"):
+        super().__init__(parent, highlightthickness=0, bd=0)
+        self.colors, self.focused = (fill, border, focus, back), False
+        self.bind("<Configure>", lambda e: self.redraw(e.width, e.height))
+        self.bind("<Destroy>", lambda e: _round_widgets.remove(self))
+        _round_widgets.append(self)
+
+    def follow_focus(self, widget):
+        """يلوّن الإطار بلون التركيز ما دام widget (المحتوى) يستقبل لوحة المفاتيح."""
+        widget.bind("<FocusIn>", lambda e: self.set_focused(True), add="+")
+        widget.bind("<FocusOut>", lambda e: self.set_focused(False), add="+")
+
+    def set_focused(self, on):
+        self.focused = on
+        self.redraw()
+
+    def redraw(self, w=None, h=None):
+        fill, border, focus, back = self.colors
+        self.configure(bg=T[back])
+        edge = focus if self.focused else border
+        paint_round(self, w or self.winfo_width(), h or self.winfo_height(), T[fill], T[edge] if edge else None,
+                    max(1, px(1)))  # قبل ظهور النافذة الحجم 1 فلا يُرسم شيء، ثم يرسمه حدث Configure
+
 def set_titlebar_dark(dark):
     """شريط عنوان النافذة يتبع الثيم (Windows 10/11)."""
     try:
@@ -1056,6 +1242,12 @@ def set_titlebar_dark(dark):
         hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
         value = ctypes.c_int(1 if dark else 0)
         ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(value), 4)
+        # الحد (34) والشريط (35) ونصه (36) بألوان الثيم بدل لون تمييز Windows؛ Windows 11 فقط، وما قبله يتجاهلها.
+        # COLORREF ترتيبه 0x00BBGGRR، عكس "#RRGGBB"
+        for attr, key in ((34, "border"), (35, "bg"), (36, "ink")):
+            h = T[key]
+            color = ctypes.c_int(int(h[5:7] + h[3:5] + h[1:3], 16))
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(color), 4)
     except Exception:
         pass
 
@@ -1076,7 +1268,9 @@ def apply_theme(mode):
         widget.configure(**{k: T[v] for k, v in opts.items()})
     for lbl, name, size, color_key in _icon_labels:
         lbl.configure(image=ui_icons.tk_icon(name, px(size), T[color_key]))
-    btn_capture.configure(image=ui_icons.tk_icon("capture", px(22), T["on_primary"]))
+    for widget in _round_widgets:
+        widget.redraw()
+    autostart_box.configure(image=check_image(False), selectimage=check_image(True))
     set_status(*current_status)
     set_titlebar_dark(mode == "dark")
 
@@ -1089,30 +1283,14 @@ def watch_system_theme():
 main_frame = reg(tk.Frame(root, padx=px(24), pady=px(18)), bg="bg")
 main_frame.pack(expand=True, fill='both')
 
-def style_button(btn):
-    """ألوان الحالات: عادي / مرور المؤشر / ضغط / تركيز لوحة المفاتيح."""
-    btn.bind("<Enter>", lambda e: btn.config(bg=T["primary_hover"]))
-    btn.bind("<Leave>", lambda e: btn.config(bg=T["primary"]))
-    reg(btn, bg="primary", fg="on_primary", activebackground="primary_press", activeforeground="on_primary",
-        highlightbackground="primary", highlightcolor="accent")
-    btn.config(highlightthickness=2, takefocus=True)
-
-btn_capture = tk.Button(
-    main_frame,
-    text="  " + L("تحديد وقص الشاشة", "Select screen area"),
-    image=ui_icons.tk_icon("capture", px(22), T["on_primary"]), compound=SIDE,
-    command=start_capture,
-    fg='white',
-    font=(FONT, 13, 'bold'), relief='flat', bd=0, pady=px(8), cursor="hand2"
-)
-style_button(btn_capture)
+btn_capture = RoundButton(main_frame, L("تحديد وقص الشاشة", "Select screen area"), start_capture,
+                          font=(FONT, 13, 'bold'), icon="capture", icon_size=22, kind="primary", pady=12)
 btn_capture.pack(fill='x', pady=(0, px(8)))
 
 def add_hint(parent, label, key):
     """«للإلغاء Esc» بالعربية، و«Esc to cancel» بالإنجليزية؛ الاختصار داخل شريحة، من بداية السطر."""
     text = reg(tk.Label(parent, text=label, font=(FONT, 11)), bg="bg", fg="muted")
-    chip = reg(tk.Label(parent, text=key, font=("Consolas", 10), padx=px(6), pady=px(1), highlightthickness=1),
-               bg="surface", fg="ink", highlightbackground="border")
+    chip = RoundButton(parent, key, font=("Consolas", 10), kind="key", padx=7, pady=2)
     if UI_EN:
         chip.pack(side=SIDE, padx=(px(10), 0))
         text.pack(side=SIDE, padx=(px(4), 0))
@@ -1160,15 +1338,10 @@ def collapse_arrow(parent, content, key):
 
 reg(tk.Label(hint_frame, text=L("اختصار التحديد", "Capture shortcut"), font=(FONT, 11)), bg="bg", fg="muted").pack(side=SIDE)
 hint_content = reg(tk.Frame(hint_frame), bg="bg")
-hotkey_chip = reg(tk.Label(hint_content, text=pretty_hotkey(settings["hotkey"]), font=("Consolas", 10),
-                           padx=px(6), pady=px(1), highlightthickness=1),
-                  bg="surface", fg="ink", highlightbackground="border")
+hotkey_chip = RoundButton(hint_content, pretty_hotkey(settings["hotkey"]), font=("Consolas", 10), kind="key", padx=7, pady=2)
 hotkey_chip.pack(side=SIDE)
-btn_change_hotkey = tk.Button(hint_content, text=L("تغيير", "Change"), font=(FONT, 10), relief='flat', bd=0,
-                              padx=px(6), pady=px(1), highlightthickness=1, cursor="hand2", command=change_hotkey)
-reg(btn_change_hotkey, bg="surface", fg="ink", activebackground="select", activeforeground="ink",
-    highlightbackground="border", highlightcolor="primary")
-btn_change_hotkey.pack(side=SIDE, padx=mirror((px(4), 0)))
+btn_change_hotkey = RoundButton(hint_content, L("تغيير", "Change"), change_hotkey, font=(FONT, 10), padx=8, pady=2)
+btn_change_hotkey.pack(side=SIDE, padx=mirror((0, px(6))))
 add_hint(hint_content, L("للإلغاء", "to cancel"), "Esc")
 collapse_arrow(hint_frame, hint_content, "hints")
 
@@ -1178,13 +1351,15 @@ lang_var = tk.StringVar(value=settings["lang"])
 lang_var.trace_add("write", lambda *_: (settings.update(lang=lang_var.get()), save_settings()))
 icon_label(lang_frame, "languages", 18, "muted", side=SIDE, padx=mirror((6, 0)))
 reg(tk.Label(lang_frame, text=L("لغة القراءة", "Reading language"), font=(FONT, 11, 'bold')), bg="bg", fg="ink").pack(side=SIDE)
-lang_content = reg(tk.Frame(lang_frame, padx=3, pady=3), bg="chip")  # شريط اختيار: الخيار المحدد يبرز بلون السطح
-for label, value in zip(L(("عربي + إنجليزي", "عربي فقط", "إنجليزي فقط"),
-                          ("Arabic + English", "Arabic only", "English only")), LANG_VALUES):
-    reg(tk.Radiobutton(
-        lang_content, text=label, value=value, variable=lang_var,
-        font=(FONT, 11), highlightthickness=0, cursor="hand2", indicatoron=False, bd=0, padx=px(12), pady=px(4)
-    ), bg="chip", fg="ink", activebackground="chip", activeforeground="ink", selectcolor="surface").pack(side=SIDE, padx=1)
+lang_content = RoundCard(lang_frame, fill="chip", border=None)  # شريط اختيار: الخيار المحدد يبرز بلون السطح
+_lang_options = [
+    RoundButton(lang_content, label, lambda v=value: lang_var.set(v), padx=12, pady=4, back="chip",
+                selected=lambda v=value: lang_var.get() == v)
+    for label, value in zip(L(("عربي + إنجليزي", "عربي فقط", "إنجليزي فقط"),
+                              ("Arabic + English", "Arabic only", "English only")), LANG_VALUES)]
+for _option in _lang_options:
+    _option.pack(side=SIDE, padx=px(2), pady=px(3))
+lang_var.trace_add("write", lambda *_: [option.redraw() for option in _lang_options])
 collapse_arrow(lang_frame, lang_content, "lang")
 
 # التشغيل مع Windows: يُسجَّل مسار EXE في مفتاح Run، ويعود المربع لحاله إن فشل التسجيل
@@ -1204,13 +1379,18 @@ def toggle_autostart():
                  "Will start with Windows at sign-in" if on else "Will not start with Windows at sign-in"), "ok")
 
 autostart_box = reg(tk.Checkbutton(
-    autostart_frame, text="  " + L("التشغيل مع Windows", "Start with Windows"), variable=autostart_var,
-    command=toggle_autostart, font=(FONT, 11), highlightthickness=0, cursor="hand2"
-), bg="bg", fg="ink", activebackground="bg", activeforeground="primary", selectcolor="surface")
+    autostart_frame, text=L("  التشغيل مع Windows", "  Start with Windows"), variable=autostart_var,
+    command=toggle_autostart, font=(FONT, 11), highlightthickness=0, cursor="hand2",
+    # المربع صورة بألوان الثيم بدل مربع Tk الغائر، وفي بداية السطر حسب اتجاه اللغة
+    indicatoron=False, image=check_image(False), selectimage=check_image(True), compound=SIDE,
+    bd=0, relief='flat', offrelief='flat', overrelief='flat'
+), bg="bg", fg="ink", activebackground="bg", activeforeground="primary", selectcolor="bg")
 autostart_box.pack(side=SIDE)
 if not autostart_command():  # من الكود لا مسار EXE يُسجَّل، فنوضّح ذلك بجانب المربع
-    autostart_box.config(state="disabled", cursor="arrow")
-    reg(autostart_box, disabledforeground="muted")  # نص المربع المعطَّل يتبع الثيم
+    # لا نستخدم state="disabled": Tk ينقّط صورة المربع عند التعطيل. نحذف ربط النقر ولوحة المفاتيح ونبهت النص
+    autostart_box.bindtags((str(autostart_box), str(root), "all"))
+    autostart_box.config(cursor="arrow", takefocus=False)
+    reg(autostart_box, fg="muted", activeforeground="muted")
     reg(tk.Label(autostart_frame, text=L("من نسخة EXE فقط", "Built app only"), font=(FONT, 10)),
         bg="bg", fg="muted").pack(side=SIDE, padx=px(6))
 # تلميح الاختصار الثابت في الطرف المقابل من السطر السفلي
@@ -1220,14 +1400,7 @@ add_hint(last_region_hint, L("قراءة آخر منطقة", "Read last region")
 
 def secondary_button(parent, text, icon, command):
     """زر ثانوي بإطار رفيع (أخف من زر التحديد الرئيسي)، يُرتَّب من بداية السطر."""
-    btn = tk.Button(parent, text="  " + text, command=command, font=(FONT, 11), compound=SIDE,
-                    image=ui_icons.tk_icon(icon, px(16), T["ink"]), relief='flat', bd=0,
-                    padx=px(10), pady=px(3), highlightthickness=1, cursor="hand2", takefocus=True)
-    reg(btn, bg="surface", fg="ink", activebackground="select", activeforeground="ink",
-        highlightbackground="border", highlightcolor="primary")
-    _icon_labels.append((btn, icon, 16, "ink"))  # تتبدّل أيقونته مع الثيم
-    btn.bind("<Enter>", lambda e: btn.config(bg=T["select"]))
-    btn.bind("<Leave>", lambda e: btn.config(bg=T["surface"]))
+    btn = RoundButton(parent, text, command, icon=icon, padx=14, pady=7)
     btn.pack(side=SIDE, padx=mirror((px(8), 0)))
     return btn
 
@@ -1245,7 +1418,7 @@ btn_ui_lang = secondary_button(actions_frame, L("English", "العربية"), "l
 
 current_status = (L("جاهز للاستخدام", "Ready"), "info")
 reg(tk.Label(result_head, text=L("النص المستخرج", "Extracted text"), font=(FONT, 12, 'bold')), bg="bg", fg="ink").pack(side=SIDE)
-status_label = reg(tk.Label(result_head, text=current_status[0], font=(FONT, 11), padx=px(8)), bg="chip", fg="muted")
+status_label = RoundButton(result_head, current_status[0], kind="chip", icon_size=18, padx=10, pady=3)
 status_label.pack(side=SIDE, padx=px(10))
 result_head.pack(fill='x', pady=(0, px(6)))
 
@@ -1259,24 +1432,27 @@ reg(tk.Label(history_header, text=L("آخر النتائج (اضغط على نت
 btn_clear_history = secondary_button(history_header, L("مسح السجل", "Clear history"), "trash", clear_history)
 btn_clear_history.pack_configure(side=END_SIDE, padx=0)  # في الطرف المقابل لعنوان السجل
 # جدول من عمودين (الوقت والنص): الوقت من بداية السطر، والعربية من اليمين والإنجليزية من اليسار
-history_box = reg(tk.Frame(history_frame, highlightthickness=1), bg="surface", highlightbackground="border")
+history_box = RoundCard(history_frame)
 history_box.pack(fill='x')
-history_list = ttk.Treeview(history_box, columns=("t", "x"), show="", height=5, selectmode="browse", style=HISTORY_STYLE,
+history_list = ttk.Treeview(history_box, columns=("t", "x"), show="", height=2, selectmode="browse", style=HISTORY_STYLE,
                             displaycolumns=("t", "x") if UI_EN else ("x", "t"))
 history_list.column("t", width=px(120), stretch=False, anchor="w" if UI_EN else "e")
 history_list.column("x", anchor="w" if UI_EN else "e")
-history_list.pack(fill='x')
+history_list.pack(fill='x', padx=px(RoundCard.INSET), pady=px(RoundCard.INSET))
 history_list.bind("<<TreeviewSelect>>", on_history_select)  # التحديد بلوحة المفاتيح
 history_list.bind("<ButtonRelease-1>", on_history_select)  # الضغط على نتيجة محددة مسبقاً لا يغيّر التحديد فلا يطلق الحدث الأول
 history[:] = load_history()  # السجل المحفوظ من التشغيلات السابقة
 refresh_history_list()
 
+text_card = RoundCard(main_frame)  # الإطار المستدير؛ لون التركيز يظهر عليه لا على مربع النص
 original_text_area = reg(scrolledtext.ScrolledText(
-    main_frame, wrap=tk.WORD, font=(FONT, 13), relief='flat', bd=0,
-    padx=px(14), pady=px(12), highlightthickness=1
-), bg="surface", fg="ink", highlightbackground="border", highlightcolor="primary",
-   selectbackground="select", selectforeground="ink", insertbackground="ink")
-original_text_area.pack(fill='both', expand=True)
+    text_card, wrap=tk.WORD, font=(FONT, 13), relief='flat', bd=0,
+    padx=px(12), pady=px(10), highlightthickness=0
+), bg="surface", fg="ink", selectbackground="select", selectforeground="ink", insertbackground="ink")
+reg(original_text_area.frame, bg="surface")
+original_text_area.pack(fill='both', expand=True, padx=px(RoundCard.INSET), pady=px(RoundCard.INSET))
+text_card.follow_focus(original_text_area)
+text_card.pack(fill='both', expand=True)
 original_text_area.tag_configure("rtl", justify="right")  # يُطبَّق في show_original حسب لغة النص
 theme_scrollbar(original_text_area)
 
@@ -1285,13 +1461,16 @@ translation_frame = reg(tk.Frame(main_frame), bg="bg")
 translation_frame.pack_propagate(False)  # عرضه يُضبط بنصف المساحة، لا بحجم محتواه
 translation_label = reg(tk.Label(translation_frame, text=L("الترجمة", "Translation"), font=(FONT, 10)), bg="bg", fg="vio")
 translation_label.pack(anchor=ANCHOR, pady=(0, px(4)))
+translation_card = RoundCard(translation_frame, focus="vio")
 translation_area = reg(scrolledtext.ScrolledText(
-    translation_frame, wrap=tk.WORD, font=(FONT, 13), width=1, height=1, relief='flat', bd=0,
-    padx=px(14), pady=px(12), highlightthickness=1, state="disabled"
-), bg="surface", fg="ink", highlightbackground="border", highlightcolor="vio",
-   selectbackground="select", selectforeground="ink", insertbackground="ink")
+    translation_card, wrap=tk.WORD, font=(FONT, 13), width=1, height=1, relief='flat', bd=0,
+    padx=px(12), pady=px(10), highlightthickness=0, state="disabled"
+), bg="surface", fg="ink", selectbackground="select", selectforeground="ink", insertbackground="ink")
+reg(translation_area.frame, bg="surface")
 translation_area.tag_configure("rtl", justify="right")
-translation_area.pack(fill='both', expand=True)
+translation_area.pack(fill='both', expand=True, padx=px(RoundCard.INSET), pady=px(RoundCard.INSET))
+translation_card.follow_focus(translation_area)
+translation_card.pack(fill='both', expand=True)
 theme_scrollbar(translation_area)
 main_frame.bind("<Configure>", lambda e: translation_frame.config(width=(e.width - px(48)) // 2), add="+")
 
